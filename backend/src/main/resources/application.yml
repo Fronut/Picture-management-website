@@ -7,14 +7,13 @@ spring:
     multipart:
       max-file-size: 100MB
       max-request-size: 100MB
-
 ---
 spring:
   config:
     activate:
       on-profile: dev
   datasource:
-    url: jdbc:mysql://localhost:3306/picture_management_dev?useSSL=false&serverTimezone=UTC
+    url: jdbc:mysql://localhost:3306/picture_management_dev?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: dev_user
     password: dev_password
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -60,7 +59,7 @@ spring:
     activate:
       on-profile: docker
   datasource:
-    url: jdbc:mysql://mysql:3306/picture_management?useSSL=false&serverTimezone=UTC
+    url: jdbc:mysql://mysql:3306/picture_management?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: app_user
     password: app_password
   redis:
