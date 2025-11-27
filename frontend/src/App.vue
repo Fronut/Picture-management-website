@@ -1,19 +1,26 @@
 ﻿<template>
-  <div id="app">
-    <h1>Picture Management System</h1>
-    <p>Development in progress...</p>
-  </div>
+  <el-container class="app-shell">
+    <app-header />
+    <el-main class="app-main">
+      <router-view />
+    </el-main>
+  </el-container>
 </template>
 
 <script setup lang="ts">
-// 应用主组件
+import AppHeader from "@/components/layout/AppHeader.vue";
 </script>
 
-<style>
-#app {
-  font-family: Avenir, Helvetica, Arial, sans-serif;
-  text-align: center;
-  color: #2c3e50;
-  margin-top: 60px;
+<style scoped>
+.app-shell {
+  min-height: 100vh;
+  background: var(--pm-background);
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+  padding: 24px;
 }
 </style>
