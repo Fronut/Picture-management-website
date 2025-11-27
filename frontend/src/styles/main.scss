@@ -1,0 +1,27 @@
+:root {
+  --pm-background: #f3f5f9;
+  --pm-surface: #ffffff;
+  --pm-border: rgba(0, 0, 0, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--pm-background);
+  color: #1f2d3d;
+}
+
+a {
+  color: #409eff;
+}
+
+.full-height-card {
+  min-height: calc(100vh - 160px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
