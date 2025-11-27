@@ -1,6 +1,9 @@
 <template>
   <section class="auth-page">
-    <el-card class="auth-card" shadow="hover">
+    <el-card
+      class="auth-card"
+      shadow="hover"
+    >
       <template #header>
         <div class="card-header">
           <h2>Welcome Back</h2>
@@ -8,8 +11,16 @@
         </div>
       </template>
 
-      <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
-        <el-form-item label="Username or Email" prop="usernameOrEmail">
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        label-position="top"
+      >
+        <el-form-item
+          label="Username or Email"
+          prop="usernameOrEmail"
+        >
           <el-input
             v-model="form.usernameOrEmail"
             placeholder="Enter username or email"
@@ -17,7 +28,10 @@
           />
         </el-form-item>
 
-        <el-form-item label="Password" prop="password">
+        <el-form-item
+          label="Password"
+          prop="password"
+        >
           <el-input
             v-model="form.password"
             type="password"
@@ -40,7 +54,9 @@
 
       <p class="switch-text">
         Don't have an account?
-        <router-link to="/auth/register">Create one</router-link>
+        <router-link to="/auth/register">
+          Create one
+        </router-link>
       </p>
     </el-card>
   </section>

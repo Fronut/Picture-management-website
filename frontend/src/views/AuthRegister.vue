@@ -1,6 +1,9 @@
 <template>
   <section class="auth-page">
-    <el-card class="auth-card" shadow="hover">
+    <el-card
+      class="auth-card"
+      shadow="hover"
+    >
       <template #header>
         <div class="card-header">
           <h2>Create Account</h2>
@@ -8,8 +11,16 @@
         </div>
       </template>
 
-      <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
-        <el-form-item label="Username" prop="username">
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        label-position="top"
+      >
+        <el-form-item
+          label="Username"
+          prop="username"
+        >
           <el-input
             v-model="form.username"
             placeholder="Choose a username"
@@ -17,7 +28,10 @@
           />
         </el-form-item>
 
-        <el-form-item label="Email" prop="email">
+        <el-form-item
+          label="Email"
+          prop="email"
+        >
           <el-input
             v-model="form.email"
             placeholder="Enter your email"
@@ -25,7 +39,10 @@
           />
         </el-form-item>
 
-        <el-form-item label="Password" prop="password">
+        <el-form-item
+          label="Password"
+          prop="password"
+        >
           <el-input
             v-model="form.password"
             type="password"
@@ -48,7 +65,9 @@
 
       <p class="switch-text">
         Already have an account?
-        <router-link to="/auth/login">Sign in</router-link>
+        <router-link to="/auth/login">
+          Sign in
+        </router-link>
       </p>
     </el-card>
   </section>

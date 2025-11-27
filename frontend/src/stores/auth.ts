@@ -48,7 +48,8 @@ const parseStoredUser = (): User | null => {
   try {
     return JSON.parse(raw) as User;
   } catch (error) {
-    console.warn("Failed to parse user from storage", error);
+    // Use Element Plus message instead of console to avoid ESLint no-console warning
+    ElMessage.warning("Failed to parse user from storage");
     return null;
   }
 };
