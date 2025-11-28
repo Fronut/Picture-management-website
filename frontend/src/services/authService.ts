@@ -1,10 +1,6 @@
 import apiClient from "./apiClient";
-import type {
-  ApiResponse,
-  AuthResponse,
-  LoginPayload,
-  RegisterPayload,
-} from "@/types/auth";
+import type { AuthResponse, LoginPayload, RegisterPayload } from "@/types/auth";
+import type { ApiResponse } from "@/types/api";
 
 const AUTH_BASE = "/auth";
 
