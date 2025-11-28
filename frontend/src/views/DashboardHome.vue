@@ -1,33 +1,23 @@
 <template>
   <section class="dashboard">
     <el-row :gutter="24">
-      <el-col
-        :sm="24"
-        :lg="12"
-      >
-        <el-card
-          shadow="never"
-          class="welcome-card"
-        >
+      <el-col :sm="24" :lg="12">
+        <el-card shadow="never" class="welcome-card">
           <h2>Hello, {{ user?.username }}</h2>
           <p>
             Use the sidebar (coming soon) to upload, search, and manage your
             images.
           </p>
-          <el-alert
-            type="info"
-            show-icon
-            :closable="false"
-          >
+          <el-button type="primary" @click="goToUpload">
+            立即上传图片
+          </el-button>
+          <el-alert type="info" show-icon :closable="false">
             Authentication is ready. Hook up future modules to the shared API
             client to reuse JWT handling.
           </el-alert>
         </el-card>
       </el-col>
-      <el-col
-        :sm="24"
-        :lg="12"
-      >
+      <el-col :sm="24" :lg="12">
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">
@@ -36,19 +26,13 @@
           </template>
           <el-descriptions :column="1">
             <el-descriptions-item label="Username">
-              {{
-                user?.username
-              }}
+              {{ user?.username }}
             </el-descriptions-item>
             <el-descriptions-item label="Email">
-              {{
-                user?.email
-              }}
+              {{ user?.email }}
             </el-descriptions-item>
             <el-descriptions-item label="Role">
-              {{
-                user?.role
-              }}
+              {{ user?.role }}
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
@@ -59,11 +43,17 @@
 
 <script setup lang="ts">
 import { storeToRefs } from "pinia";
+import { useRouter } from "vue-router";
 
 import { useAuthStore } from "@/stores/auth";
 
 const authStore = useAuthStore();
 const { user } = storeToRefs(authStore);
+const router = useRouter();
+
+const goToUpload = () => {
+  router.push({ name: "image-upload" });
+};
 </script>
 
 <style scoped>

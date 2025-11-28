@@ -1,9 +1,6 @@
 <template>
   <el-header class="app-header">
-    <div
-      class="branding"
-      @click="goHome"
-    >
+    <div class="branding" @click="goHome">
       <span class="logo">PM</span>
       <div>
         <p class="app-name">
@@ -14,33 +11,23 @@
     </div>
     <div class="spacer" />
     <template v-if="isAuthenticated">
-      <el-space
-        alignment="center"
-        :size="16"
-      >
+      <el-space alignment="center" :size="16">
         <div class="user-info">
           <p class="user-name">
             {{ user?.username }}
           </p>
           <small class="user-email">{{ user?.email }}</small>
         </div>
-        <el-button
-          type="primary"
-          @click="handleLogout"
-        >
-          Logout
+        <el-button type="success" plain @click="navigateTo('/images/upload')">
+          上传图片
         </el-button>
+        <el-button type="primary" @click="handleLogout"> Logout </el-button>
       </el-space>
     </template>
     <template v-else>
       <el-button-group>
-        <el-button @click="navigateTo('/auth/login')">
-          Login
-        </el-button>
-        <el-button
-          type="primary"
-          @click="navigateTo('/auth/register')"
-        >
+        <el-button @click="navigateTo('/auth/login')"> Login </el-button>
+        <el-button type="primary" @click="navigateTo('/auth/register')">
           Register
         </el-button>
       </el-button-group>
