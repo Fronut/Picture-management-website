@@ -6,18 +6,13 @@ export interface User {
   role: string;
 }
 
+export type { ApiResponse } from "./api";
+
 export interface AuthResponse {
   token: string;
   tokenType: string;
   expiresIn: number;
   user: User;
-}
-
-export interface ApiResponse<T> {
-  code: number;
-  message: string;
-  data: T;
-  timestamp: string;
 }
 
 export interface LoginPayload {
