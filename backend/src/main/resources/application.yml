@@ -42,7 +42,11 @@ app:
   file:
     upload-dir: ./uploads
     max-size: 104857600
-    allowed-types: image/jpeg,image/png,image/gif,image/webp
+    allowed-types:
+      - image/jpeg
+      - image/png
+      - image/gif
+      - image/webp
   ai:
     service-url: http://localhost:5000
     timeout: 30000
@@ -69,6 +73,12 @@ spring:
 app:
   file:
     upload-dir: /app/uploads
+    max-size: 104857600
+    allowed-types:
+      - image/jpeg
+      - image/png
+      - image/gif
+      - image/webp
 
 ---
 spring:
@@ -95,6 +105,11 @@ app:
   file:
     upload-dir: ${UPLOAD_DIR:./uploads}
     max-size: ${MAX_FILE_SIZE:104857600}
+    allowed-types:
+      - image/jpeg
+      - image/png
+      - image/gif
+      - image/webp
   ai:
     service-url: ${AI_SERVICE_URL:http://ai-service:5000}
     timeout: ${AI_SERVICE_TIMEOUT:30000}

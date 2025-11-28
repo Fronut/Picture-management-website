@@ -17,3 +17,9 @@ app:
   jwt:
     secret: test-jwt-secret-key-test-jwt-secret-key
     expiration: 3600000
+  file:
+    upload-dir: ./build/test-uploads
+    max-size: 5242880
+    allowed-types:
+      - image/jpeg
+      - image/png
