@@ -7,8 +7,10 @@ import com.imagemanagement.entity.enums.ImagePrivacyLevel;
 import com.imagemanagement.exception.BadRequestException;
 import com.imagemanagement.repository.ImageRepository;
 import com.imagemanagement.repository.UserRepository;
+import com.imagemanagement.service.ExifExtractionService;
 import com.imagemanagement.service.FileStorageService;
 import com.imagemanagement.service.ImageService;
+import com.imagemanagement.service.ThumbnailService;
 import jakarta.transaction.Transactional;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -29,11 +31,19 @@ public class ImageServiceImpl implements ImageService {
     private final ImageRepository imageRepository;
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
+    private final ExifExtractionService exifExtractionService;
+    private final ThumbnailService thumbnailService;
 
-    public ImageServiceImpl(ImageRepository imageRepository, UserRepository userRepository, FileStorageService fileStorageService) {
+    public ImageServiceImpl(ImageRepository imageRepository,
+            UserRepository userRepository,
+            FileStorageService fileStorageService,
+            ExifExtractionService exifExtractionService,
+            ThumbnailService thumbnailService) {
         this.imageRepository = imageRepository;
         this.userRepository = userRepository;
         this.fileStorageService = fileStorageService;
+        this.exifExtractionService = exifExtractionService;
+        this.thumbnailService = thumbnailService;
     }
 
     @Override
@@ -75,12 +85,15 @@ public class ImageServiceImpl implements ImageService {
         image.setDescription(description);
         image.setPrivacyLevel(privacyLevel != null ? privacyLevel : ImagePrivacyLevel.PUBLIC);
 
-        setImageDimensions(image, storedFile.absolutePath());
+        Path imagePath = Path.of(storedFile.absolutePath());
+        setImageDimensions(image, imagePath);
+        exifExtractionService.extract(imagePath, image).ifPresent(image::setExifData);
+        thumbnailService.generateThumbnails(image);
         return image;
     }
 
-    private void setImageDimensions(Image image, String absolutePath) {
-        try (var inputStream = Files.newInputStream(Path.of(absolutePath))) {
+    private void setImageDimensions(Image image, Path absolutePath) {
+        try (var inputStream = Files.newInputStream(absolutePath)) {
             BufferedImage bufferedImage = ImageIO.read(inputStream);
             if (bufferedImage != null) {
                 image.setWidth(bufferedImage.getWidth());
