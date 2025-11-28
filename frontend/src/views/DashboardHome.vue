@@ -1,23 +1,39 @@
 <template>
   <section class="dashboard">
     <el-row :gutter="24">
-      <el-col :sm="24" :lg="12">
-        <el-card shadow="never" class="welcome-card">
+      <el-col
+        :sm="24"
+        :lg="12"
+      >
+        <el-card
+          shadow="never"
+          class="welcome-card"
+        >
           <h2>Hello, {{ user?.username }}</h2>
           <p>
             Use the sidebar (coming soon) to upload, search, and manage your
             images.
           </p>
-          <el-button type="primary" @click="goToUpload">
+          <el-button
+            type="primary"
+            @click="goToUpload"
+          >
             立即上传图片
           </el-button>
-          <el-alert type="info" show-icon :closable="false">
+          <el-alert
+            type="info"
+            show-icon
+            :closable="false"
+          >
             Authentication is ready. Hook up future modules to the shared API
             client to reuse JWT handling.
           </el-alert>
         </el-card>
       </el-col>
-      <el-col :sm="24" :lg="12">
+      <el-col
+        :sm="24"
+        :lg="12"
+      >
         <el-card shadow="hover">
           <template #header>
             <div class="card-header">

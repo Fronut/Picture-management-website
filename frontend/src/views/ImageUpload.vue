@@ -9,7 +9,7 @@
                 <h2>图片上传</h2>
                 <p>选择图片、设置隐私与描述，点击上传即可。</p>
               </div>
-              <el-tag type="info">最大 20MB/张 (后端限制)</el-tag>
+              <el-tag type="info"> 最大 20MB/张 (后端限制) </el-tag>
             </div>
           </template>
 
@@ -41,8 +41,8 @@
           <el-form label-width="80px" class="upload-form">
             <el-form-item label="隐私">
               <el-radio-group v-model="privacyLevel">
-                <el-radio-button label="PRIVATE">私有</el-radio-button>
-                <el-radio-button label="PUBLIC">公开</el-radio-button>
+                <el-radio-button label="PRIVATE"> 私有 </el-radio-button>
+                <el-radio-button label="PUBLIC"> 公开 </el-radio-button>
               </el-radio-group>
             </el-form-item>
             <el-form-item label="描述">
@@ -75,7 +75,9 @@
             <el-table v-else :data="candidates" size="small">
               <el-table-column label="文件名" min-width="200">
                 <template #default="{ row }">
-                  <div class="file-name">{{ row.file.name }}</div>
+                  <div class="file-name">
+                    {{ row.file.name }}
+                  </div>
                   <small class="file-meta">
                     {{ formatBytes(row.file.size) }} ·
                     {{ row.file.type || "未知类型" }}
@@ -153,7 +155,9 @@
                 :timestamp="formatTimestamp(image.uploadTime)"
               >
                 <div class="timeline-item">
-                  <p class="file-name">{{ image.originalFilename }}</p>
+                  <p class="file-name">
+                    {{ image.originalFilename }}
+                  </p>
                   <small class="file-meta">
                     {{ formatBytes(image.fileSize) }} · {{ image.mimeType }}
                   </small>
@@ -205,7 +209,7 @@ const handleFileChange: UploadProps["onChange"] = (
   uploadRef.value?.clearFiles();
 };
 
-const handleExceed: UploadProps["onExceed"] = (_files) => {
+const handleExceed: UploadProps["onExceed"] = () => {
   ElMessage.info("已添加到待上传列表");
 };
 
