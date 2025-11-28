@@ -2,6 +2,8 @@ package com.imagemanagement.image;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.imagemanagement.config.ThumbnailProperties;
+import com.imagemanagement.entity.Image;
 import com.imagemanagement.entity.User;
 import com.imagemanagement.entity.enums.UserRole;
 import com.imagemanagement.entity.enums.UserStatus;
@@ -60,16 +62,24 @@ class ImageUploadControllerTest {
     @Value("${app.file.upload-dir}")
     private Path uploadDir;
 
+    @Value("${app.thumbnail.base-dir}")
+    private Path thumbnailDir;
+
+    @Autowired
+    private ThumbnailProperties thumbnailProperties;
+
     @BeforeEach
     void setUp() throws IOException {
         imageRepository.deleteAll();
         userRepository.deleteAll();
-        deleteUploads();
+        deleteDirectory(uploadDir);
+        deleteDirectory(thumbnailDir);
     }
 
     @AfterEach
     void tearDown() throws IOException {
-        deleteUploads();
+        deleteDirectory(uploadDir);
+        deleteDirectory(thumbnailDir);
     }
 
     @Test
@@ -94,6 +104,10 @@ class ImageUploadControllerTest {
                 .andExpect(jsonPath("$.data[0].storedFilename").isNotEmpty());
 
         assertThat(imageRepository.count()).isEqualTo(1);
+        Image storedImage = imageRepository.findAll().get(0);
+        assertThat(storedImage.getThumbnails()).hasSize(thumbnailProperties.getPresets().size());
+        storedImage.getThumbnails().forEach(thumbnail ->
+                assertThat(Files.exists(Path.of(thumbnail.getFilePath()))).isTrue());
         assertThat(Files.exists(uploadDir)).isTrue();
         try (var stream = Files.list(uploadDir.resolve(String.valueOf(user.getId())))) {
             assertThat(stream.count()).isEqualTo(1);
@@ -133,9 +147,9 @@ class ImageUploadControllerTest {
         }
     }
 
-    private void deleteUploads() throws IOException {
-        if (uploadDir != null && Files.exists(uploadDir)) {
-            try (var paths = Files.walk(uploadDir)) {
+    private void deleteDirectory(Path directory) throws IOException {
+        if (directory != null && Files.exists(directory)) {
+            try (var paths = Files.walk(directory)) {
                 paths.sorted((p1, p2) -> p2.compareTo(p1))
                         .forEach(path -> {
                             try {
