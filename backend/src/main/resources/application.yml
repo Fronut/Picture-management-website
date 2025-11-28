@@ -47,6 +47,18 @@ app:
       - image/png
       - image/gif
       - image/webp
+  thumbnail:
+    base-dir: ./thumbnails
+    presets:
+      - type: SMALL
+        width: 256
+        height: 256
+      - type: MEDIUM
+        width: 512
+        height: 512
+      - type: LARGE
+        width: 1024
+        height: 1024
   ai:
     service-url: http://localhost:5000
     timeout: 30000
@@ -79,6 +91,18 @@ app:
       - image/png
       - image/gif
       - image/webp
+  thumbnail:
+    base-dir: /app/thumbnails
+    presets:
+      - type: SMALL
+        width: 256
+        height: 256
+      - type: MEDIUM
+        width: 512
+        height: 512
+      - type: LARGE
+        width: 1024
+        height: 1024
 
 ---
 spring:
@@ -110,6 +134,18 @@ app:
       - image/png
       - image/gif
       - image/webp
+  thumbnail:
+    base-dir: ${THUMBNAIL_DIR:./thumbnails}
+    presets:
+      - type: SMALL
+        width: 256
+        height: 256
+      - type: MEDIUM
+        width: 512
+        height: 512
+      - type: LARGE
+        width: 1024
+        height: 1024
   ai:
     service-url: ${AI_SERVICE_URL:http://ai-service:5000}
     timeout: ${AI_SERVICE_TIMEOUT:30000}

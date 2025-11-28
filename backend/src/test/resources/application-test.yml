@@ -23,3 +23,12 @@ app:
     allowed-types:
       - image/jpeg
       - image/png
+  thumbnail:
+    base-dir: ./build/test-thumbnails
+    presets:
+      - type: SMALL
+        width: 128
+        height: 128
+      - type: MEDIUM
+        width: 256
+        height: 256
