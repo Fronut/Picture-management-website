@@ -10,6 +10,7 @@ import com.imagemanagement.repository.UserRepository;
 import com.imagemanagement.service.ExifExtractionService;
 import com.imagemanagement.service.FileStorageService;
 import com.imagemanagement.service.ImageService;
+import com.imagemanagement.service.TagService;
 import com.imagemanagement.service.ThumbnailService;
 import jakarta.transaction.Transactional;
 import java.awt.image.BufferedImage;
@@ -33,17 +34,20 @@ public class ImageServiceImpl implements ImageService {
     private final FileStorageService fileStorageService;
     private final ExifExtractionService exifExtractionService;
     private final ThumbnailService thumbnailService;
+    private final TagService tagService;
 
     public ImageServiceImpl(ImageRepository imageRepository,
             UserRepository userRepository,
             FileStorageService fileStorageService,
             ExifExtractionService exifExtractionService,
-            ThumbnailService thumbnailService) {
+            ThumbnailService thumbnailService,
+            TagService tagService) {
         this.imageRepository = imageRepository;
         this.userRepository = userRepository;
         this.fileStorageService = fileStorageService;
         this.exifExtractionService = exifExtractionService;
         this.thumbnailService = thumbnailService;
+        this.tagService = tagService;
     }
 
     @Override
@@ -68,9 +72,11 @@ public class ImageServiceImpl implements ImageService {
         }
 
         List<Image> savedImages = imageRepository.saveAll(imagesToSave);
+        savedImages.forEach(tagService::applyAutomaticTags);
+
         return savedImages.stream()
-                .map(this::toResponse)
-                .toList();
+            .map(this::toResponse)
+            .toList();
     }
 
     private Image buildImageEntity(User user, FileStorageService.StoredFileInfo storedFile,
