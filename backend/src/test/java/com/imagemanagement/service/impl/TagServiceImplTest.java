@@ -3,6 +3,7 @@ package com.imagemanagement.service.impl;
 import com.imagemanagement.dto.request.AiTagAssignmentRequest;
 import com.imagemanagement.dto.request.TagAssignmentRequest;
 import com.imagemanagement.dto.response.ImageTagResponse;
+import com.imagemanagement.exception.BadRequestException;
 import com.imagemanagement.entity.ExifData;
 import com.imagemanagement.entity.Image;
 import com.imagemanagement.entity.User;
@@ -23,6 +24,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @DataJpaTest
 @Import(TagServiceImpl.class)
@@ -109,6 +111,15 @@ class TagServiceImplTest {
     }
 
     @Test
+    void assignAiTags_shouldRejectEmptyPayload() {
+        AiTagAssignmentRequest request = new AiTagAssignmentRequest(List.of());
+
+        assertThatThrownBy(() -> tagService.assignAiTags(user.getId(), image.getId(), request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("tags cannot be empty");
+    }
+
+    @Test
     void applyAutomaticTags_shouldGenerateExifBasedTags() {
         ExifData exif = new ExifData();
         exif.setImage(image);
@@ -127,5 +138,23 @@ class TagServiceImplTest {
         assertThat(responses).isNotEmpty();
         assertThat(responses).extracting(ImageTagResponse::tagName)
                 .contains("year:2023", "camera:Nikon", "location:Shanghai", "orientation:landscape");
+    }
+
+    @Test
+    void assignCustomTags_shouldDeduplicateAndNormalizeNames() {
+        TagAssignmentRequest request = new TagAssignmentRequest(List.of(" City ", "city", "CITY"));
+
+        List<ImageTagResponse> responses = tagService.assignCustomTags(user.getId(), image.getId(), request);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).tagName()).isEqualTo("City");
+        assertThat(tagRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void getTagsForImage_shouldFailWhenImageMissing() {
+        assertThatThrownBy(() -> tagService.getTagsForImage(999L))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("Image not found");
     }
 }
