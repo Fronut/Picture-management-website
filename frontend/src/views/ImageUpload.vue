@@ -161,6 +161,13 @@
                   <small class="file-meta">
                     {{ formatBytes(image.fileSize) }} · {{ image.mimeType }}
                   </small>
+                  <el-button
+                    text
+                    size="small"
+                    @click="goToTagManager(image.id)"
+                  >
+                    管理标签
+                  </el-button>
                 </div>
               </el-timeline-item>
             </el-timeline>
@@ -183,9 +190,11 @@ import type {
 } from "element-plus";
 import { ElMessage } from "element-plus";
 import { UploadFilled } from "@element-plus/icons-vue";
+import { useRouter } from "vue-router";
 
 import { useImageUploadStore } from "@/stores/imageUpload";
 
+const router = useRouter();
 const uploadRef = ref<UploadInstance>();
 const uploadStore = useImageUploadStore();
 
@@ -224,6 +233,10 @@ const handleClearAll = () => {
 
 const handleUpload = () => {
   uploadStore.upload();
+};
+
+const goToTagManager = (imageId: number) => {
+  router.push({ name: "image-tags", params: { imageId } });
 };
 
 const formatBytes = (size: number) => {
