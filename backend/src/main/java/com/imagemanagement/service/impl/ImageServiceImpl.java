@@ -149,7 +149,7 @@ public class ImageServiceImpl implements ImageService {
                 image.getId(),
                 image.getOriginalFilename(),
                 image.getStoredFilename(),
-                image.getFilePath(),
+            buildImageContentEndpoint(image.getId()),
                 image.getFileSize(),
                 image.getMimeType(),
                 image.getWidth(),
@@ -185,7 +185,7 @@ public class ImageServiceImpl implements ImageService {
         response.setId(image.getId());
         response.setOriginalFilename(image.getOriginalFilename());
         response.setStoredFilename(image.getStoredFilename());
-        response.setFilePath(image.getFilePath());
+        response.setFilePath(buildImageContentEndpoint(image.getId()));
         response.setFileSize(image.getFileSize());
         response.setMimeType(image.getMimeType());
         response.setWidth(image.getWidth());
@@ -201,7 +201,7 @@ public class ImageServiceImpl implements ImageService {
         }
 
         response.setTags(extractTagNames(image.getImageTags()));
-        response.setThumbnails(extractThumbnailSummaries(image.getThumbnails()));
+        response.setThumbnails(extractThumbnailSummaries(image));
         return response;
     }
 
@@ -219,7 +219,8 @@ public class ImageServiceImpl implements ImageService {
                 .toList();
     }
 
-    private List<ImageSummaryResponse.ThumbnailSummary> extractThumbnailSummaries(Set<Thumbnail> thumbnails) {
+    private List<ImageSummaryResponse.ThumbnailSummary> extractThumbnailSummaries(Image image) {
+        Set<Thumbnail> thumbnails = image.getThumbnails();
         if (CollectionUtils.isEmpty(thumbnails)) {
             return List.of();
         }
@@ -232,10 +233,24 @@ public class ImageServiceImpl implements ImageService {
                     summary.setSizeType(thumbnail.getSizeType());
                     summary.setWidth(thumbnail.getWidth());
                     summary.setHeight(thumbnail.getHeight());
-                    summary.setFilePath(thumbnail.getFilePath());
+                    summary.setFilePath(buildThumbnailContentEndpoint(image.getId(), thumbnail.getId()));
                     summary.setFileSize(thumbnail.getFileSize());
                     return summary;
                 })
                 .toList();
+    }
+
+    private String buildImageContentEndpoint(Long imageId) {
+        if (imageId == null) {
+            return null;
+        }
+        return "/api/images/" + imageId + "/content";
+    }
+
+    private String buildThumbnailContentEndpoint(Long imageId, Long thumbnailId) {
+        if (imageId == null || thumbnailId == null) {
+            return null;
+        }
+        return "/api/images/" + imageId + "/thumbnails/" + thumbnailId;
     }
 }
