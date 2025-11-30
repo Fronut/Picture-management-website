@@ -1,6 +1,7 @@
 package com.imagemanagement.service.impl;
 
 import com.imagemanagement.dto.request.LoginRequest;
+import com.imagemanagement.dto.request.RefreshTokenRequest;
 import com.imagemanagement.dto.request.RegisterRequest;
 import com.imagemanagement.dto.response.AuthResponse;
 import com.imagemanagement.dto.response.UserResponse;
@@ -11,6 +12,9 @@ import com.imagemanagement.repository.UserRepository;
 import com.imagemanagement.security.CustomUserDetails;
 import com.imagemanagement.security.jwt.JwtTokenProvider;
 import com.imagemanagement.service.AuthService;
+import com.imagemanagement.service.CacheWarmupService;
+import com.imagemanagement.service.RefreshTokenService;
+import com.imagemanagement.service.UserProfileService;
 import java.util.Objects;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -27,13 +31,21 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
+    private final RefreshTokenService refreshTokenService;
+    private final UserProfileService userProfileService;
+    private final CacheWarmupService cacheWarmupService;
 
     public AuthServiceImpl(UserRepository userRepository, PasswordEncoder passwordEncoder,
-            AuthenticationManager authenticationManager, JwtTokenProvider jwtTokenProvider) {
+            AuthenticationManager authenticationManager, JwtTokenProvider jwtTokenProvider,
+            RefreshTokenService refreshTokenService, UserProfileService userProfileService,
+            CacheWarmupService cacheWarmupService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.refreshTokenService = refreshTokenService;
+        this.userProfileService = userProfileService;
+        this.cacheWarmupService = cacheWarmupService;
     }
 
     @Override
@@ -60,7 +72,10 @@ public class AuthServiceImpl implements AuthService {
 
         String token = jwtTokenProvider.generateToken(authentication);
 
-        return new AuthResponse(token, jwtTokenProvider.getExpirationMillis(), toUserResponse(saved));
+        var refreshToken = refreshTokenService.issueToken(saved.getId());
+        var userResponse = userProfileService.cacheProfile(saved);
+        cacheWarmupService.warmupUserCaches(saved.getId());
+        return buildAuthResponse(token, refreshToken.getToken(), userResponse);
     }
 
     @Override
@@ -73,11 +88,34 @@ public class AuthServiceImpl implements AuthService {
         Long principalId = Objects.requireNonNull(principal.getId(), "User id must not be null");
         User user = userRepository.findById(principalId).orElseThrow();
         String token = jwtTokenProvider.generateToken(authentication);
-
-        return new AuthResponse(token, jwtTokenProvider.getExpirationMillis(), toUserResponse(user));
+        var refreshToken = refreshTokenService.issueToken(user.getId());
+        var userResponse = userProfileService.cacheProfile(user);
+        cacheWarmupService.warmupUserCaches(user.getId());
+        return buildAuthResponse(token, refreshToken.getToken(), userResponse);
     }
 
-    private UserResponse toUserResponse(User user) {
-        return new UserResponse(user.getId(), user.getUsername(), user.getEmail(), user.getAvatarUrl(), user.getRole());
+    @Override
+    public AuthResponse refreshToken(RefreshTokenRequest request) {
+        var nextRefreshToken = refreshTokenService.refreshToken(request.getRefreshToken());
+        User user = nextRefreshToken.getUser();
+        String accessToken = jwtTokenProvider.generateToken(user.getId());
+        var userResponse = userProfileService.cacheProfile(user);
+        cacheWarmupService.warmupUserCaches(user.getId());
+        return buildAuthResponse(accessToken, nextRefreshToken.getToken(), userResponse);
+    }
+
+    @Override
+    public void logout(RefreshTokenRequest request) {
+        refreshTokenService.revokeToken(request.getRefreshToken());
+    }
+
+    private AuthResponse buildAuthResponse(String accessToken, String refreshToken, UserResponse userResponse) {
+        AuthResponse response = new AuthResponse();
+        response.setToken(accessToken);
+        response.setExpiresIn(jwtTokenProvider.getExpirationMillis());
+        response.setRefreshToken(refreshToken);
+        response.setRefreshExpiresIn(refreshTokenService.getRefreshTokenTtlMillis());
+        response.setUser(userResponse);
+        return response;
     }
 }
