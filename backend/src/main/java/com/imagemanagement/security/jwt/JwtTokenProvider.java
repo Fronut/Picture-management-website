@@ -27,11 +27,18 @@ public class JwtTokenProvider {
 
     public String generateToken(Authentication authentication) {
         CustomUserDetails userPrincipal = (CustomUserDetails) authentication.getPrincipal();
+        return generateToken(userPrincipal.getId());
+    }
+
+    public String generateToken(Long userId) {
+        if (userId == null) {
+            throw new IllegalArgumentException("userId cannot be null when generating token");
+        }
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtProperties.getExpiration());
 
         return Jwts.builder()
-                .setSubject(String.valueOf(userPrincipal.getId()))
+                .setSubject(String.valueOf(userId))
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(secretKey, SignatureAlgorithm.HS512)
@@ -58,6 +65,10 @@ public class JwtTokenProvider {
 
     public long getExpirationMillis() {
         return jwtProperties.getExpiration();
+    }
+
+    public long getRefreshExpirationMillis() {
+        return jwtProperties.getRefreshExpiration();
     }
 
     private SecretKey initSecretKey(String secret) {
