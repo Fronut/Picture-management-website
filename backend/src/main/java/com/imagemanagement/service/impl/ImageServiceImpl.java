@@ -1,5 +1,6 @@
 package com.imagemanagement.service.impl;
 
+import com.imagemanagement.cache.CacheNames;
 import com.imagemanagement.dto.request.ImageSearchRequest;
 import com.imagemanagement.dto.response.ImageSummaryResponse;
 import com.imagemanagement.dto.response.ImageUploadResponse;
@@ -29,6 +30,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import javax.imageio.ImageIO;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -65,6 +68,7 @@ public class ImageServiceImpl implements ImageService {
     }
 
     @Override
+    @CacheEvict(value = CacheNames.IMAGE_SEARCH, allEntries = true)
     public List<ImageUploadResponse> uploadImages(Long userId, List<MultipartFile> files, ImagePrivacyLevel privacyLevel, String description) {
         if (userId == null) {
             throw new BadRequestException("User id is required");
@@ -94,7 +98,9 @@ public class ImageServiceImpl implements ImageService {
     }
 
     @Override
-    public PageResponse<ImageSummaryResponse> searchImages(Long userId, ImageSearchRequest request) {
+        @Cacheable(cacheNames = CacheNames.IMAGE_SEARCH,
+            key = "T(com.imagemanagement.cache.CacheKeyGenerator).imageSearchKey(#userId, #request)")
+        public PageResponse<ImageSummaryResponse> searchImages(Long userId, ImageSearchRequest request) {
         ImageSearchRequest criteria = request != null ? request : new ImageSearchRequest();
         validateRange(criteria.getMinWidth(), criteria.getMaxWidth(), "width");
         validateRange(criteria.getMinHeight(), criteria.getMaxHeight(), "height");
