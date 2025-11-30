@@ -39,6 +39,12 @@ app:
   jwt:
     secret: dev-jwt-secret-key-change-in-production
     expiration: 86400000
+    refresh-expiration: 604800000
+  cache:
+    default-ttl: 5m
+    users-ttl: 30m
+    images-ttl: 10m
+    search-ttl: 5m
   file:
     upload-dir: ./uploads
     max-size: 104857600
@@ -103,6 +109,11 @@ app:
       - type: LARGE
         width: 1024
         height: 1024
+  cache:
+    default-ttl: 5m
+    users-ttl: 30m
+    images-ttl: 10m
+    search-ttl: 5m
 
 ---
 spring:
@@ -126,6 +137,12 @@ app:
   jwt:
     secret: ${JWT_SECRET}
     expiration: ${JWT_EXPIRATION:86400000}
+    refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+  cache:
+    default-ttl: ${CACHE_DEFAULT_TTL:5m}
+    users-ttl: ${CACHE_USERS_TTL:30m}
+    images-ttl: ${CACHE_IMAGES_TTL:10m}
+    search-ttl: ${CACHE_SEARCH_TTL:5m}
   file:
     upload-dir: ${UPLOAD_DIR:./uploads}
     max-size: ${MAX_FILE_SIZE:104857600}

@@ -17,6 +17,12 @@ app:
   jwt:
     secret: test-jwt-secret-key-test-jwt-secret-key
     expiration: 3600000
+    refresh-expiration: 604800000
+  cache:
+    default-ttl: 5m
+    users-ttl: 30m
+    images-ttl: 10m
+    search-ttl: 5m
   file:
     upload-dir: ./build/test-uploads
     max-size: 5242880
