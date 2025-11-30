@@ -1,12 +1,18 @@
 package com.imagemanagement.service.impl;
 
+import com.imagemanagement.dto.request.ImageSearchRequest;
+import com.imagemanagement.dto.response.ImageSummaryResponse;
 import com.imagemanagement.dto.response.ImageUploadResponse;
+import com.imagemanagement.dto.response.PageResponse;
 import com.imagemanagement.entity.Image;
+import com.imagemanagement.entity.ImageTag;
+import com.imagemanagement.entity.Thumbnail;
 import com.imagemanagement.entity.User;
 import com.imagemanagement.entity.enums.ImagePrivacyLevel;
 import com.imagemanagement.exception.BadRequestException;
 import com.imagemanagement.repository.ImageRepository;
 import com.imagemanagement.repository.UserRepository;
+import com.imagemanagement.repository.specification.ImageSpecifications;
 import com.imagemanagement.service.ExifExtractionService;
 import com.imagemanagement.service.FileStorageService;
 import com.imagemanagement.service.ImageService;
@@ -18,11 +24,19 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import javax.imageio.ImageIO;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -79,6 +93,19 @@ public class ImageServiceImpl implements ImageService {
             .toList();
     }
 
+    @Override
+    public PageResponse<ImageSummaryResponse> searchImages(Long userId, ImageSearchRequest request) {
+        ImageSearchRequest criteria = request != null ? request : new ImageSearchRequest();
+        validateRange(criteria.getMinWidth(), criteria.getMaxWidth(), "width");
+        validateRange(criteria.getMinHeight(), criteria.getMaxHeight(), "height");
+
+        Sort sort = Objects.requireNonNull(buildSort(criteria));
+        Pageable pageable = PageRequest.of(criteria.getPage(), criteria.getSize(), sort);
+        Specification<Image> specification = Objects.requireNonNull(ImageSpecifications.build(criteria, userId));
+        Page<Image> images = imageRepository.findAll(specification, pageable);
+        return PageResponse.from(images.map(this::toSummaryResponse));
+    }
+
     private Image buildImageEntity(User user, FileStorageService.StoredFileInfo storedFile,
                                    ImagePrivacyLevel privacyLevel, String description) {
         Image image = new Image();
@@ -123,5 +150,86 @@ public class ImageServiceImpl implements ImageService {
                 image.getHeight(),
                 image.getUploadTime()
         );
+    }
+
+    private Sort buildSort(ImageSearchRequest request) {
+        String sortBy = request.getSortBy();
+        Sort.Direction direction = request.getSortDirection();
+        if (direction == null) {
+            direction = Sort.Direction.DESC;
+        }
+        String property = switch (sortBy != null ? sortBy : "") {
+            case "originalFilename" -> "originalFilename";
+            case "fileSize" -> "fileSize";
+            case "width" -> "width";
+            case "height" -> "height";
+            default -> "uploadTime";
+        };
+        return Sort.by(direction, property);
+    }
+
+    private void validateRange(Integer min, Integer max, String fieldName) {
+        if (min != null && max != null && min > max) {
+            throw new BadRequestException("Invalid " + fieldName + " range: min must be <= max");
+        }
+    }
+
+    private ImageSummaryResponse toSummaryResponse(Image image) {
+        ImageSummaryResponse response = new ImageSummaryResponse();
+        response.setId(image.getId());
+        response.setOriginalFilename(image.getOriginalFilename());
+        response.setStoredFilename(image.getStoredFilename());
+        response.setFilePath(image.getFilePath());
+        response.setFileSize(image.getFileSize());
+        response.setMimeType(image.getMimeType());
+        response.setWidth(image.getWidth());
+        response.setHeight(image.getHeight());
+        response.setDescription(image.getDescription());
+        response.setPrivacyLevel(image.getPrivacyLevel());
+        response.setUploadTime(image.getUploadTime());
+
+        if (image.getExifData() != null) {
+            response.setCameraMake(image.getExifData().getCameraMake());
+            response.setCameraModel(image.getExifData().getCameraModel());
+            response.setTakenTime(image.getExifData().getTakenTime());
+        }
+
+        response.setTags(extractTagNames(image.getImageTags()));
+        response.setThumbnails(extractThumbnailSummaries(image.getThumbnails()));
+        return response;
+    }
+
+    private List<String> extractTagNames(Set<ImageTag> imageTags) {
+        if (CollectionUtils.isEmpty(imageTags)) {
+            return List.of();
+        }
+        return imageTags.stream()
+                .map(ImageTag::getTag)
+                .filter(Objects::nonNull)
+                .map(tag -> tag.getTagName() != null ? tag.getTagName() : "")
+                .filter(StringUtils::hasText)
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    private List<ImageSummaryResponse.ThumbnailSummary> extractThumbnailSummaries(Set<Thumbnail> thumbnails) {
+        if (CollectionUtils.isEmpty(thumbnails)) {
+            return List.of();
+        }
+
+        return thumbnails.stream()
+                .sorted(Comparator.comparing(thumbnail -> thumbnail.getSizeType().name()))
+                .map(thumbnail -> {
+                    ImageSummaryResponse.ThumbnailSummary summary = new ImageSummaryResponse.ThumbnailSummary();
+                    summary.setId(thumbnail.getId());
+                    summary.setSizeType(thumbnail.getSizeType());
+                    summary.setWidth(thumbnail.getWidth());
+                    summary.setHeight(thumbnail.getHeight());
+                    summary.setFilePath(thumbnail.getFilePath());
+                    summary.setFileSize(thumbnail.getFileSize());
+                    return summary;
+                })
+                .toList();
     }
 }
