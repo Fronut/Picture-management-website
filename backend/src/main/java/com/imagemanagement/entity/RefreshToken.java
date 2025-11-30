@@ -35,7 +35,7 @@ public class RefreshToken {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
-    @Column(name = "revoked", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "revoked", nullable = false)
     private boolean revoked = false;
 
     @Column(name = "created_at", nullable = false, updatable = false)
