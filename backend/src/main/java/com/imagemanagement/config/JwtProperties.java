@@ -15,6 +15,9 @@ public class JwtProperties {
     @NotNull
     private Long expiration;
 
+    @NotNull
+    private Long refreshExpiration;
+
     public String getSecret() {
         return secret;
     }
@@ -29,5 +32,13 @@ public class JwtProperties {
 
     public void setExpiration(Long expiration) {
         this.expiration = expiration;
+    }
+
+    public Long getRefreshExpiration() {
+        return refreshExpiration;
+    }
+
+    public void setRefreshExpiration(Long refreshExpiration) {
+        this.refreshExpiration = refreshExpiration;
     }
 }
