@@ -1,6 +1,7 @@
 package com.imagemanagement.controller;
 
 import com.imagemanagement.dto.request.LoginRequest;
+import com.imagemanagement.dto.request.RefreshTokenRequest;
 import com.imagemanagement.dto.request.RegisterRequest;
 import com.imagemanagement.dto.response.ApiResponse;
 import com.imagemanagement.dto.response.AuthResponse;
@@ -30,5 +31,16 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(ApiResponse.success(authService.login(request)));
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(authService.refreshToken(request)));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(@Valid @RequestBody RefreshTokenRequest request) {
+        authService.logout(request);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 }
