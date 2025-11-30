@@ -106,7 +106,11 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public void logout(RefreshTokenRequest request) {
-        refreshTokenService.revokeToken(request.getRefreshToken());
+        if (request.isLogoutAllSessions()) {
+            refreshTokenService.revokeAllSessions(request.getRefreshToken());
+        } else {
+            refreshTokenService.revokeToken(request.getRefreshToken());
+        }
     }
 
     private AuthResponse buildAuthResponse(String accessToken, String refreshToken, UserResponse userResponse) {

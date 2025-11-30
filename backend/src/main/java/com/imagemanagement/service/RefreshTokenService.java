@@ -10,6 +10,8 @@ public interface RefreshTokenService {
 
     void revokeToken(String tokenValue);
 
+    void revokeAllSessions(String tokenValue);
+
     void revokeTokensForUser(Long userId);
 
     long getRefreshTokenTtlMillis();

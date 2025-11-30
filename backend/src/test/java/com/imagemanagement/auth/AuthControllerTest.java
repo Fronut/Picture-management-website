@@ -38,16 +38,16 @@ class AuthControllerTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-        @Autowired
-        private RefreshTokenRepository refreshTokenRepository;
+    @Autowired
+    private RefreshTokenRepository refreshTokenRepository;
 
-        @Autowired
-        private ObjectMapper objectMapper;
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
         userRepository.deleteAll();
-                refreshTokenRepository.deleteAll();
+        refreshTokenRepository.deleteAll();
     }
 
     @Test
@@ -66,6 +66,8 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.data.user.username").value("testuser"));
 
         assertThat(userRepository.existsByUsernameIgnoreCase("testuser")).isTrue();
+        Long userId = findUserId("testuser");
+        assertThat(refreshTokenRepository.countByUser_IdAndRevokedFalse(userId)).isEqualTo(1);
     }
 
     @Test
@@ -131,7 +133,10 @@ class AuthControllerTest {
         JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
         String rotatedToken = json.at("/data/refreshToken").asText();
         assertThat(rotatedToken).isNotBlank().isNotEqualTo(refreshToken);
-        assertThat(refreshTokenRepository.count()).isEqualTo(1);
+
+        Long userId = findUserId("refreshuser");
+        assertThat(refreshTokenRepository.count()).isEqualTo(2);
+        assertThat(refreshTokenRepository.countByUser_IdAndRevokedFalse(userId)).isEqualTo(1);
     }
 
     @Test
@@ -146,7 +151,29 @@ class AuthControllerTest {
                         .content(request))
                 .andExpect(status().isOk());
 
-        assertThat(refreshTokenRepository.count()).isZero();
+        Long userId = findUserId("logoutuser");
+        assertThat(refreshTokenRepository.countByUser_IdAndRevokedFalse(userId)).isZero();
+    }
+
+    @Test
+    void logoutAllSessions_shouldInvalidateEveryRefreshToken() throws Exception {
+        String firstToken = registerAndExtractRefreshToken("logoutall", "logoutall@example.com");
+        String secondToken = loginAndExtractRefreshToken("logoutall", "Password123");
+        assertThat(secondToken).isNotBlank().isNotEqualTo(firstToken);
+
+        Long userId = findUserId("logoutall");
+        assertThat(refreshTokenRepository.countByUser_IdAndRevokedFalse(userId)).isEqualTo(2);
+
+        String request = "{" +
+                "\"refreshToken\":\"" + firstToken + "\"," +
+                "\"logoutAllSessions\":true}";
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON_VALUE)
+                        .content(request))
+                .andExpect(status().isOk());
+
+        assertThat(refreshTokenRepository.countByUser_IdAndRevokedFalse(userId)).isZero();
     }
 
     private String registerAndExtractRefreshToken(String username, String email) throws Exception {
@@ -163,5 +190,26 @@ class AuthControllerTest {
 
         JsonNode jsonNode = objectMapper.readTree(result.getResponse().getContentAsString());
         return jsonNode.at("/data/refreshToken").asText();
+    }
+
+    private String loginAndExtractRefreshToken(String usernameOrEmail, String password) throws Exception {
+        String payload = "{" +
+                "\"usernameOrEmail\":\"" + usernameOrEmail + "\"," +
+                "\"password\":\"" + password + "\"}";
+
+        var result = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON_VALUE)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode jsonNode = objectMapper.readTree(result.getResponse().getContentAsString());
+        return jsonNode.at("/data/refreshToken").asText();
+    }
+
+    private Long findUserId(String username) {
+        return userRepository.findByUsernameIgnoreCase(username)
+                .map(User::getId)
+                .orElseThrow();
     }
 }
