@@ -12,6 +12,7 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
   flyway:
     enabled: true
+    locations: classpath:db/test-migration
 
 app:
   jwt:
