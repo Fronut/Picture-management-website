@@ -247,6 +247,7 @@ import {
 } from "vue";
 import { useRouter } from "vue-router";
 import dayjs from "dayjs";
+import { ElMessage } from "element-plus";
 
 import { useImageSearchStore } from "@/stores/imageSearch";
 import type { ImageSearchResult, ImageSearchPayload } from "@/types/image";
@@ -391,7 +392,7 @@ const ensureOriginal = async (image: ImageSearchResult) => {
     const blob = await downloadOriginalImage(image.id);
     originalSrcMap[image.id] = rememberObjectUrl(blob);
   } catch (error) {
-    console.warn("Failed to load original image", error);
+    ElMessage.warning("原图加载失败，稍后重试");
   } finally {
     originalLoads.delete(image.id);
   }
@@ -411,7 +412,7 @@ const ensureThumbnail = async (image: ImageSearchResult) => {
     const blob = await downloadThumbnail(image.id, preferred.id);
     thumbnailSrcMap[preferred.id] = rememberObjectUrl(blob);
   } catch (error) {
-    console.warn("Failed to load thumbnail", error);
+    ElMessage.warning("缩略图加载失败，尝试使用原图");
     await ensureOriginal(image);
   } finally {
     thumbnailLoads.delete(preferred.id);
