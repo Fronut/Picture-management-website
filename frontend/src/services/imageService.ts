@@ -58,6 +58,29 @@ export const searchImages = async (
   return data.data;
 };
 
+export const downloadThumbnail = async (
+  imageId: number,
+  thumbnailId: number
+): Promise<Blob> => {
+  const { data } = await apiClient.get<Blob>(
+    `${IMAGE_BASE}/${imageId}/thumbnails/${thumbnailId}`,
+    {
+      responseType: "blob",
+    }
+  );
+  return data;
+};
+
+export const downloadOriginalImage = async (imageId: number): Promise<Blob> => {
+  const { data } = await apiClient.get<Blob>(
+    `${IMAGE_BASE}/${imageId}/content`,
+    {
+      responseType: "blob",
+    }
+  );
+  return data;
+};
+
 const normalizeSearchPayload = (payload: ImageSearchPayload) => ({
   keyword: payload.keyword?.trim() || undefined,
   privacyLevel: payload.privacyLevel,

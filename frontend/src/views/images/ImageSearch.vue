@@ -237,12 +237,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  watch,
+} from "vue";
 import { useRouter } from "vue-router";
 import dayjs from "dayjs";
 
 import { useImageSearchStore } from "@/stores/imageSearch";
 import type { ImageSearchResult, ImageSearchPayload } from "@/types/image";
+import {
+  downloadOriginalImage,
+  downloadThumbnail,
+} from "@/services/imageService";
 
 const router = useRouter();
 const store = useImageSearchStore();
@@ -260,6 +271,14 @@ const pagination = computed(() => store.pagination);
 const filters = computed(() => store.filters);
 const loading = computed(() => store.loading);
 const hasResults = computed(() => store.hasResults);
+
+const thumbnailSrcMap = reactive<Record<number, string>>({});
+const originalSrcMap = reactive<Record<number, string>>({});
+const thumbnailLoads = new Set<number>();
+const originalLoads = new Set<number>();
+const allocatedUrls = new Set<string>();
+const transparentPixel =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
 const dateShortcuts = [
   {
@@ -334,14 +353,86 @@ const formatResolution = (image: ImageSearchResult) => {
   return `${image.width} × ${image.height}`;
 };
 
-const thumbnailUrl = (image: ImageSearchResult) => {
+const getPreferredThumbnail = (image: ImageSearchResult) => {
   if (!image.thumbnails.length) {
-    return image.filePath;
+    return null;
   }
-  const preferred =
+  return (
     image.thumbnails.find((thumb) => thumb.sizeType === "SMALL") ??
-    image.thumbnails[0];
-  return preferred.filePath;
+    image.thumbnails[0]
+  );
+};
+
+const rememberObjectUrl = (blob: Blob) => {
+  const url = URL.createObjectURL(blob);
+  allocatedUrls.add(url);
+  return url;
+};
+
+const clearMediaCaches = () => {
+  allocatedUrls.forEach((url) => URL.revokeObjectURL(url));
+  allocatedUrls.clear();
+  Object.keys(thumbnailSrcMap).forEach((key) => {
+    delete thumbnailSrcMap[Number(key)];
+  });
+  Object.keys(originalSrcMap).forEach((key) => {
+    delete originalSrcMap[Number(key)];
+  });
+  thumbnailLoads.clear();
+  originalLoads.clear();
+};
+
+const ensureOriginal = async (image: ImageSearchResult) => {
+  if (originalSrcMap[image.id] || originalLoads.has(image.id)) {
+    return;
+  }
+  originalLoads.add(image.id);
+  try {
+    const blob = await downloadOriginalImage(image.id);
+    originalSrcMap[image.id] = rememberObjectUrl(blob);
+  } catch (error) {
+    console.warn("Failed to load original image", error);
+  } finally {
+    originalLoads.delete(image.id);
+  }
+};
+
+const ensureThumbnail = async (image: ImageSearchResult) => {
+  const preferred = getPreferredThumbnail(image);
+  if (!preferred) {
+    await ensureOriginal(image);
+    return;
+  }
+  if (thumbnailSrcMap[preferred.id] || thumbnailLoads.has(preferred.id)) {
+    return;
+  }
+  thumbnailLoads.add(preferred.id);
+  try {
+    const blob = await downloadThumbnail(image.id, preferred.id);
+    thumbnailSrcMap[preferred.id] = rememberObjectUrl(blob);
+  } catch (error) {
+    console.warn("Failed to load thumbnail", error);
+    await ensureOriginal(image);
+  } finally {
+    thumbnailLoads.delete(preferred.id);
+  }
+};
+
+const thumbnailUrl = (image: ImageSearchResult) => {
+  const preferred = getPreferredThumbnail(image);
+  if (preferred) {
+    if (thumbnailSrcMap[preferred.id]) {
+      return thumbnailSrcMap[preferred.id];
+    }
+    void ensureThumbnail(image);
+    return transparentPixel;
+  }
+
+  if (originalSrcMap[image.id]) {
+    return originalSrcMap[image.id];
+  }
+  void ensureOriginal(image);
+  return transparentPixel;
 };
 
 const goToTagManager = (imageId: number) => {
@@ -361,10 +452,27 @@ watch(
   { deep: true }
 );
 
+watch(
+  () => store.results,
+  (images, previous) => {
+    if (previous) {
+      clearMediaCaches();
+    }
+    images.forEach((image) => {
+      void ensureThumbnail(image);
+    });
+  },
+  { immediate: true }
+);
+
 onMounted(() => {
   if (!store.hasResults) {
     store.fetch();
   }
+});
+
+onBeforeUnmount(() => {
+  clearMediaCaches();
 });
 </script>
 
