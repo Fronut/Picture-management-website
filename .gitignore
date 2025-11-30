@@ -154,6 +154,8 @@ Desktop.ini
 ### Uploads ###
 uploads/
 temp/
+backend/uploads/
+backend/thumbnails/
 
 ### AI Models ###
 *.pth
