@@ -72,10 +72,13 @@ export const useImageUploadStore = defineStore("imageUpload", {
       this.privacyLevel = level;
     },
     async upload() {
-      if (!this.readyFiles.length) {
+      const readyCandidates = this.readyFiles;
+      if (!readyCandidates.length) {
         ElMessage.warning("请先选择要上传的图片");
         return;
       }
+
+      const filesToUpload = readyCandidates.map((candidate) => candidate.file);
 
       this.isUploading = true;
       this.summary = null;
@@ -89,7 +92,7 @@ export const useImageUploadStore = defineStore("imageUpload", {
 
       try {
         const response = await uploadImages({
-          files: this.readyFiles.map((candidate) => candidate.file),
+          files: filesToUpload,
           privacyLevel: this.privacyLevel,
           description: this.description,
         });
