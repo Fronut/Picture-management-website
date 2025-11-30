@@ -23,6 +23,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: "/images/search",
+      name: "image-search",
+      component: () => import("@/views/images/ImageSearch.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
       path: "/images/:imageId/tags",
       name: "image-tags",
       component: () => import("@/views/ImageTagManager.vue"),
