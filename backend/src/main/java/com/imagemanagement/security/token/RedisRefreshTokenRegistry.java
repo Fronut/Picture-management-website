@@ -2,6 +2,7 @@ package com.imagemanagement.security.token;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.context.annotation.Profile;
@@ -27,7 +28,7 @@ public class RedisRefreshTokenRegistry implements RefreshTokenRegistry {
         if (!StringUtils.hasText(tokenValue) || userId == null || expiresAt == null) {
             return;
         }
-        String tokenHash = TokenHashUtils.sha256(tokenValue);
+        String tokenHash = Objects.requireNonNull(TokenHashUtils.sha256(tokenValue), "tokenHash");
         RefreshTokenState state = new RefreshTokenState();
         state.setTokenHash(tokenHash);
         state.setUserId(userId);
@@ -37,8 +38,11 @@ public class RedisRefreshTokenRegistry implements RefreshTokenRegistry {
         if (ttl.isNegative() || ttl.isZero()) {
             ttl = Duration.ofSeconds(1);
         }
-        redisTemplate.opsForValue().set(tokenKey(tokenHash), state, ttl);
-        redisTemplate.opsForSet().add(userKey(userId), tokenHash);
+        redisTemplate.opsForValue().set(
+            Objects.requireNonNull(tokenKey(tokenHash)),
+            state,
+            Objects.requireNonNull(ttl));
+        redisTemplate.opsForSet().add(Objects.requireNonNull(userKey(userId)), tokenHash);
     }
 
     @Override
@@ -46,7 +50,7 @@ public class RedisRefreshTokenRegistry implements RefreshTokenRegistry {
         if (!StringUtils.hasText(tokenValue)) {
             return;
         }
-        String tokenHash = TokenHashUtils.sha256(tokenValue);
+        String tokenHash = Objects.requireNonNull(TokenHashUtils.sha256(tokenValue), "tokenHash");
         markRevokedByHash(tokenHash);
     }
 
@@ -55,7 +59,7 @@ public class RedisRefreshTokenRegistry implements RefreshTokenRegistry {
         if (userId == null) {
             return;
         }
-        Set<Object> hashes = redisTemplate.opsForSet().members(userKey(userId));
+        Set<Object> hashes = redisTemplate.opsForSet().members(Objects.requireNonNull(userKey(userId)));
         if (hashes == null || hashes.isEmpty()) {
             return;
         }
@@ -64,7 +68,7 @@ public class RedisRefreshTokenRegistry implements RefreshTokenRegistry {
                 markRevokedByHash(tokenHash);
             }
         }
-        redisTemplate.delete(userKey(userId));
+        redisTemplate.delete(Objects.requireNonNull(userKey(userId)));
     }
 
     @Override
@@ -72,7 +76,7 @@ public class RedisRefreshTokenRegistry implements RefreshTokenRegistry {
         if (!StringUtils.hasText(tokenValue)) {
             return Optional.empty();
         }
-        String tokenHash = TokenHashUtils.sha256(tokenValue);
+        String tokenHash = Objects.requireNonNull(TokenHashUtils.sha256(tokenValue), "tokenHash");
         RefreshTokenState state = getState(tokenHash);
         if (state == null) {
             return Optional.empty();
@@ -89,17 +93,17 @@ public class RedisRefreshTokenRegistry implements RefreshTokenRegistry {
         if (!StringUtils.hasText(tokenValue)) {
             return;
         }
-        String tokenHash = TokenHashUtils.sha256(tokenValue);
-        String key = tokenKey(tokenHash);
+        String tokenHash = Objects.requireNonNull(TokenHashUtils.sha256(tokenValue), "tokenHash");
+        String key = Objects.requireNonNull(tokenKey(tokenHash));
         RefreshTokenState state = getState(tokenHash);
         redisTemplate.delete(key);
         if (state != null && state.getUserId() != null) {
-            redisTemplate.opsForSet().remove(userKey(state.getUserId()), tokenHash);
+            redisTemplate.opsForSet().remove(Objects.requireNonNull(userKey(state.getUserId())), tokenHash);
         }
     }
 
     private void markRevokedByHash(String tokenHash) {
-        String key = tokenKey(tokenHash);
+        String key = Objects.requireNonNull(tokenKey(tokenHash));
         RefreshTokenState state = getState(tokenHash);
         if (state == null) {
             return;
@@ -110,16 +114,16 @@ public class RedisRefreshTokenRegistry implements RefreshTokenRegistry {
             if (ttlSeconds == null || ttlSeconds <= 0) {
                 redisTemplate.opsForValue().set(key, state);
             } else {
-                redisTemplate.opsForValue().set(key, state, Duration.ofSeconds(ttlSeconds));
+                redisTemplate.opsForValue().set(key, state, Objects.requireNonNull(Duration.ofSeconds(ttlSeconds)));
             }
         }
         if (state.getUserId() != null) {
-            redisTemplate.opsForSet().remove(userKey(state.getUserId()), tokenHash);
+            redisTemplate.opsForSet().remove(Objects.requireNonNull(userKey(state.getUserId())), tokenHash);
         }
     }
 
     private RefreshTokenState getState(String tokenHash) {
-        Object value = redisTemplate.opsForValue().get(tokenKey(tokenHash));
+        Object value = redisTemplate.opsForValue().get(Objects.requireNonNull(tokenKey(tokenHash)));
         if (value instanceof RefreshTokenState state) {
             return state;
         }
@@ -127,10 +131,10 @@ public class RedisRefreshTokenRegistry implements RefreshTokenRegistry {
     }
 
     private String tokenKey(String tokenHash) {
-        return TOKEN_PREFIX + tokenHash;
+        return TOKEN_PREFIX + Objects.requireNonNull(tokenHash, "tokenHash");
     }
 
     private String userKey(Long userId) {
-        return USER_PREFIX + userId;
+        return USER_PREFIX + Objects.requireNonNull(userId, "userId");
     }
 }
