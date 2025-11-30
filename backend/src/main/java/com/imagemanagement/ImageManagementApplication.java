@@ -1,14 +1,17 @@
 package com.imagemanagement;
 
+import com.imagemanagement.config.CacheProperties;
 import com.imagemanagement.config.FileStorageProperties;
 import com.imagemanagement.config.JwtProperties;
 import com.imagemanagement.config.ThumbnailProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 @SpringBootApplication
-@EnableConfigurationProperties({JwtProperties.class, FileStorageProperties.class, ThumbnailProperties.class})
+@EnableAsync
+@EnableConfigurationProperties({JwtProperties.class, FileStorageProperties.class, ThumbnailProperties.class, CacheProperties.class})
 public class ImageManagementApplication {
 
     public static void main(String[] args) {
