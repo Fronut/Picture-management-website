@@ -1,15 +1,20 @@
 package com.imagemanagement.controller;
 
+import com.imagemanagement.dto.request.ImageSearchRequest;
 import com.imagemanagement.dto.response.ApiResponse;
+import com.imagemanagement.dto.response.ImageSummaryResponse;
 import com.imagemanagement.dto.response.ImageUploadResponse;
+import com.imagemanagement.dto.response.PageResponse;
 import com.imagemanagement.entity.enums.ImagePrivacyLevel;
 import com.imagemanagement.security.CustomUserDetails;
 import com.imagemanagement.service.ImageService;
 import java.util.List;
+import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -36,5 +41,15 @@ public class ImageController {
         CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
         List<ImageUploadResponse> responses = imageService.uploadImages(principal.getId(), files, privacyLevel, description);
         return ResponseEntity.ok(ApiResponse.success(responses));
+    }
+
+    @PostMapping(value = "/search", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<PageResponse<ImageSummaryResponse>>> searchImages(
+            @Valid @RequestBody ImageSearchRequest request,
+            Authentication authentication) {
+
+        CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
+        PageResponse<ImageSummaryResponse> page = imageService.searchImages(principal.getId(), request);
+        return ResponseEntity.ok(ApiResponse.success(page));
     }
 }
