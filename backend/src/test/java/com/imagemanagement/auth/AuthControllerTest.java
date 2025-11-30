@@ -1,8 +1,11 @@
 package com.imagemanagement.auth;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.imagemanagement.entity.User;
 import com.imagemanagement.entity.enums.UserRole;
 import com.imagemanagement.entity.enums.UserStatus;
+import com.imagemanagement.repository.RefreshTokenRepository;
 import com.imagemanagement.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,9 +38,16 @@ class AuthControllerTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+        @Autowired
+        private RefreshTokenRepository refreshTokenRepository;
+
+        @Autowired
+        private ObjectMapper objectMapper;
+
     @BeforeEach
     void setUp() {
         userRepository.deleteAll();
+                refreshTokenRepository.deleteAll();
     }
 
     @Test
@@ -52,6 +62,7 @@ class AuthControllerTest {
                         .content(payload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.token").isNotEmpty())
+                .andExpect(jsonPath("$.data.refreshToken").isNotEmpty())
                 .andExpect(jsonPath("$.data.user.username").value("testuser"));
 
         assertThat(userRepository.existsByUsernameIgnoreCase("testuser")).isTrue();
@@ -76,6 +87,7 @@ class AuthControllerTest {
                         .content(payload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.token").isNotEmpty())
+                .andExpect(jsonPath("$.data.refreshToken").isNotEmpty())
                 .andExpect(jsonPath("$.data.user.email").value("existing@example.com"));
     }
 
@@ -99,5 +111,57 @@ class AuthControllerTest {
                         .content(payload))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Username already exists"));
+    }
+
+    @Test
+    void refresh_shouldRotateRefreshTokens() throws Exception {
+        String refreshToken = registerAndExtractRefreshToken("refreshuser", "refresh@example.com");
+
+        String request = "{" +
+                "\"refreshToken\":\"" + refreshToken + "\"}";
+
+        var result = mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON_VALUE)
+                        .content(request))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.token").isNotEmpty())
+                .andExpect(jsonPath("$.data.refreshToken").isNotEmpty())
+                .andReturn();
+
+        JsonNode json = objectMapper.readTree(result.getResponse().getContentAsString());
+        String rotatedToken = json.at("/data/refreshToken").asText();
+        assertThat(rotatedToken).isNotBlank().isNotEqualTo(refreshToken);
+        assertThat(refreshTokenRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void logout_shouldRevokeRefreshToken() throws Exception {
+        String refreshToken = registerAndExtractRefreshToken("logoutuser", "logout@example.com");
+
+        String request = "{" +
+                "\"refreshToken\":\"" + refreshToken + "\"}";
+
+        mockMvc.perform(post("/api/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON_VALUE)
+                        .content(request))
+                .andExpect(status().isOk());
+
+        assertThat(refreshTokenRepository.count()).isZero();
+    }
+
+    private String registerAndExtractRefreshToken(String username, String email) throws Exception {
+        String payload = "{" +
+                "\"username\":\"" + username + "\"," +
+                "\"email\":\"" + email + "\"," +
+                "\"password\":\"Password123\"}";
+
+        var result = mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON_VALUE)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode jsonNode = objectMapper.readTree(result.getResponse().getContentAsString());
+        return jsonNode.at("/data/refreshToken").asText();
     }
 }
