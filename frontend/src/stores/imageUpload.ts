@@ -113,29 +113,10 @@ export const useImageUploadStore = defineStore("imageUpload", {
         // build summary based on the uploaded batch
         this.summary = buildSummary(readyCandidates, response);
 
-        // Map successful responses back to candidates by filename+size
-        const successSet = new Set<string>();
-        response.forEach((r) =>
-          successSet.add(`${r.originalFilename}::${r.fileSize}`)
+        // 所有成功上传的候选直接从列表中移除，防止重复上传
+        this.candidates = this.candidates.filter(
+          (candidate) => !uploadIds.includes(candidate.id)
         );
-
-        // Update candidates: remove those that succeeded; mark those that did not as error
-        this.candidates = this.candidates.flatMap((candidate) => {
-          if (!uploadIds.includes(candidate.id)) return [candidate];
-          const key = `${candidate.file.name}::${candidate.file.size}`;
-          if (successSet.has(key)) {
-            // uploaded successfully -> remove from candidate list
-            return [];
-          }
-          // failed to upload (backend didn't return it)
-          return [
-            {
-              ...candidate,
-              status: "error",
-              errorMessage: "上传失败（服务器未返回成功信息）",
-            },
-          ];
-        });
 
         ElMessage.success(`上传成功 ${response.length} 张图片`);
       } catch (error) {
