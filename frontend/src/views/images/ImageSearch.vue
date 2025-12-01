@@ -328,10 +328,21 @@ const handleSearch = () => {
   store.searchWithFilters(payload);
 };
 
+const syncLocalFilters = (source: Partial<ImageSearchPayload>) => {
+  // remove keys not present in source so localFilters doesn't keep stale values
+  Object.keys(localFilters).forEach((k) => {
+    if (!(k in source)) {
+      // @ts-ignore
+      delete localFilters[k];
+    }
+  });
+  Object.assign(localFilters, JSON.parse(JSON.stringify(source)));
+};
+
 const handleResetFilters = () => {
   store.resetFilters();
-  // deep copy store.filters into localFilters to ensure reactive fields update
-  Object.assign(localFilters, JSON.parse(JSON.stringify(store.filters)));
+  // ensure localFilters exactly mirrors store.filters
+  syncLocalFilters(store.filters);
   dateRange.value = null;
   sortValue.value = `${store.filters.sortBy}|${store.filters.sortDirection}`;
   store.searchWithFilters();
@@ -495,7 +506,9 @@ const handleDeleteImage = async (image: ImageSearchResult) => {
 watch(
   () => store.filters,
   (newFilters) => {
-    Object.assign(localFilters, newFilters);
+    // ensure localFilters matches store filters exactly
+    syncLocalFilters(newFilters);
+    // ensure computed filters value (store) reflects newFilters
     Object.assign(filters.value, newFilters);
     sortValue.value = `${newFilters.sortBy}|${newFilters.sortDirection}`;
     if (newFilters.uploadedFrom && newFilters.uploadedTo) {
