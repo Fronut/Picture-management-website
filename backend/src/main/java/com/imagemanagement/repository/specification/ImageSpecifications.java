@@ -88,26 +88,25 @@ public final class ImageSpecifications {
         if (userId == null) {
             return cb.equal(privacyPath, ImagePrivacyLevel.PUBLIC);
         }
+        // If client specified a privacy level, honor it and combine with onlyOwn when provided
+        if (request.getPrivacyLevel() == ImagePrivacyLevel.PRIVATE) {
+            // PRIVATE images are only visible to the owner
+            return cb.and(cb.equal(privacyPath, ImagePrivacyLevel.PRIVATE), cb.equal(ownerIdPath, userId));
+        }
 
+        if (request.getPrivacyLevel() == ImagePrivacyLevel.PUBLIC) {
+            if (Boolean.TRUE.equals(request.getOnlyOwn())) {
+                // onlyOwn + PUBLIC => only the user's public images
+                return cb.and(cb.equal(privacyPath, ImagePrivacyLevel.PUBLIC), cb.equal(ownerIdPath, userId));
+            }
+            return cb.equal(privacyPath, ImagePrivacyLevel.PUBLIC);
+        }
+
+        // No explicit privacy level from client
         if (Boolean.TRUE.equals(request.getOnlyOwn())) {
             return cb.equal(ownerIdPath, userId);
         }
 
-        if (request.getPrivacyLevel() == ImagePrivacyLevel.PRIVATE) {
-            // Only return images that are private and owned by the current user
-            return cb.and(
-                    cb.equal(privacyPath, ImagePrivacyLevel.PRIVATE),
-                    cb.equal(ownerIdPath, userId)
-            );
-        }
-
-        if (request.getPrivacyLevel() == ImagePrivacyLevel.PUBLIC) {
-            return cb.equal(privacyPath, ImagePrivacyLevel.PUBLIC);
-        }
-
-        return cb.or(
-                cb.equal(privacyPath, ImagePrivacyLevel.PUBLIC),
-                cb.equal(ownerIdPath, userId)
-        );
+        return cb.or(cb.equal(privacyPath, ImagePrivacyLevel.PUBLIC), cb.equal(ownerIdPath, userId));
     }
 }
