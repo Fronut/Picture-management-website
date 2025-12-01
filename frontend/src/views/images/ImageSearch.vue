@@ -51,26 +51,26 @@
               <div class="range-inputs">
                 <el-input-number
                   v-model="localFilters.minWidth"
-                  :min="0"
+                  :min="1"
                   placeholder="最小宽"
                 />
                 <span>~</span>
                 <el-input-number
                   v-model="localFilters.maxWidth"
-                  :min="0"
+                  :min="1"
                   placeholder="最大宽"
                 />
               </div>
               <div class="range-inputs">
                 <el-input-number
                   v-model="localFilters.minHeight"
-                  :min="0"
+                  :min="1"
                   placeholder="最小高"
                 />
                 <span>~</span>
                 <el-input-number
                   v-model="localFilters.maxHeight"
-                  :min="0"
+                  :min="1"
                   placeholder="最大高"
                 />
               </div>
@@ -95,7 +95,8 @@
               <el-radio-group v-model="localFilters.privacyLevel">
                 <el-radio-button label="PUBLIC">公开</el-radio-button>
                 <el-radio-button label="PRIVATE">私有</el-radio-button>
-                <el-radio-button :label="undefined">全部</el-radio-button>
+                <!-- use explicit ALL token and convert to undefined in request normalization -->
+                <el-radio-button label="ALL">全部</el-radio-button>
               </el-radio-group>
             </el-form-item>
 
@@ -329,7 +330,8 @@ const handleSearch = () => {
 
 const handleResetFilters = () => {
   store.resetFilters();
-  Object.assign(localFilters, store.filters);
+  // deep copy store.filters into localFilters to ensure reactive fields update
+  Object.assign(localFilters, JSON.parse(JSON.stringify(store.filters)));
   dateRange.value = null;
   sortValue.value = `${store.filters.sortBy}|${store.filters.sortDirection}`;
   store.searchWithFilters();

@@ -98,16 +98,64 @@ export const deleteImage = async (
 
 const normalizeSearchPayload = (payload: ImageSearchPayload) => ({
   keyword: payload.keyword?.trim() || undefined,
-  privacyLevel: payload.privacyLevel,
+  // privacy: treat explicit 'ALL' as undefined to avoid sending an invalid enum
+  privacyLevel:
+    payload.privacyLevel === "ALL" ? undefined : payload.privacyLevel,
   tags: payload.tags?.filter((tag) => tag.trim()) ?? [],
   uploadedFrom: payload.uploadedFrom ?? undefined,
   uploadedTo: payload.uploadedTo ?? undefined,
   cameraMake: payload.cameraMake?.trim() || undefined,
   cameraModel: payload.cameraModel?.trim() || undefined,
-  minWidth: payload.minWidth ?? undefined,
-  maxWidth: payload.maxWidth ?? undefined,
-  minHeight: payload.minHeight ?? undefined,
-  maxHeight: payload.maxHeight ?? undefined,
+  // Normalise numeric ranges: disallow non-positive, and ensure min <= max by swapping
+  minWidth: (() => {
+    let min = payload.minWidth ?? undefined;
+    let max = payload.maxWidth ?? undefined;
+    if (typeof min === "number" && min <= 0) min = undefined;
+    if (typeof max === "number" && max <= 0) max = undefined;
+    if (typeof min === "number" && typeof max === "number" && min > max) {
+      // swap to be friendly
+      const t = min;
+      min = max;
+      max = t;
+    }
+    return min ?? undefined;
+  })(),
+  maxWidth: (() => {
+    let min = payload.minWidth ?? undefined;
+    let max = payload.maxWidth ?? undefined;
+    if (typeof min === "number" && min <= 0) min = undefined;
+    if (typeof max === "number" && max <= 0) max = undefined;
+    if (typeof min === "number" && typeof max === "number" && min > max) {
+      const t = min;
+      min = max;
+      max = t;
+    }
+    return max ?? undefined;
+  })(),
+  minHeight: (() => {
+    let min = payload.minHeight ?? undefined;
+    let max = payload.maxHeight ?? undefined;
+    if (typeof min === "number" && min <= 0) min = undefined;
+    if (typeof max === "number" && max <= 0) max = undefined;
+    if (typeof min === "number" && typeof max === "number" && min > max) {
+      const t = min;
+      min = max;
+      max = t;
+    }
+    return min ?? undefined;
+  })(),
+  maxHeight: (() => {
+    let min = payload.minHeight ?? undefined;
+    let max = payload.maxHeight ?? undefined;
+    if (typeof min === "number" && min <= 0) min = undefined;
+    if (typeof max === "number" && max <= 0) max = undefined;
+    if (typeof min === "number" && typeof max === "number" && min > max) {
+      const t = min;
+      min = max;
+      max = t;
+    }
+    return max ?? undefined;
+  })(),
   onlyOwn: payload.onlyOwn ?? false,
   page: payload.page ?? 0,
   size: payload.size ?? 20,
