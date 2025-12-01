@@ -75,6 +75,10 @@ public class RedisConfig {
         BasicPolymorphicTypeValidator validator = BasicPolymorphicTypeValidator.builder()
             .allowIfSubType("com.imagemanagement")
             .allowIfSubType("java.time")
+            // 允许 java.util 的集合类（例如 Collections$UnmodifiableRandomAccessList）被反序列化
+            .allowIfSubType("java.util")
+            // 允许基础的 java.lang 类型（安全范围内）
+            .allowIfSubType("java.lang")
             .build();
         mapper.activateDefaultTyping(validator, ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
         return new GenericJackson2JsonRedisSerializer(Objects.requireNonNull(mapper));
