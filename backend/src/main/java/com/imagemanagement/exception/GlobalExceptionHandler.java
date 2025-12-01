@@ -3,6 +3,8 @@ package com.imagemanagement.exception;
 import com.imagemanagement.dto.response.ApiResponse;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
+import java.util.LinkedHashMap;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -21,6 +23,16 @@ public class GlobalExceptionHandler {
         }
         ApiResponse<Map<String, String>> response = ApiResponse.error(HttpStatus.BAD_REQUEST.value(), "Validation failed");
         response.setData(errors);
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    @ExceptionHandler(com.imagemanagement.exception.DuplicateFileException.class)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> handleDuplicateFiles(com.imagemanagement.exception.DuplicateFileException ex) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        List<String> duplicates = ex.getDuplicates();
+        data.put("duplicates", duplicates);
+        ApiResponse<Map<String, Object>> response = ApiResponse.error(HttpStatus.BAD_REQUEST.value(), ex.getMessage());
+        response.setData(data);
         return ResponseEntity.badRequest().body(response);
     }
 

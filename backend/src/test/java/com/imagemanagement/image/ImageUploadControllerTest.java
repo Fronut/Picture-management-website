@@ -136,7 +136,8 @@ class ImageUploadControllerTest {
                 .header("Authorization", "Bearer " + token)
                 .contentType(Objects.requireNonNull(MediaType.MULTIPART_FORM_DATA)))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message", hasToString(containsString("duplicate.png"))));
+            .andExpect(jsonPath("$.message", hasToString(containsString("duplicate.png"))))
+            .andExpect(jsonPath("$.data.duplicates[0]").value("duplicate.png"));
     }
 
     @NonNull

@@ -115,7 +115,8 @@ public class ImageServiceImpl implements ImageService {
         }
 
         if (!duplicatedFilenames.isEmpty()) {
-            throw new BadRequestException("以下文件已上传过，无法重复上传：" + String.join(", ", duplicatedFilenames));
+            String message = "以下文件已上传过，无法重复上传：" + String.join(", ", duplicatedFilenames);
+            throw new com.imagemanagement.exception.DuplicateFileException(new java.util.ArrayList<>(duplicatedFilenames), message);
         }
 
         for (PendingUpload pendingUpload : pendingUploads) {

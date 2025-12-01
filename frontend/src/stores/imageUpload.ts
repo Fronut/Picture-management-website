@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { v4 as uuid } from "uuid";
 import { ElMessage } from "element-plus";
+import { isAxiosError } from "axios";
 
 import { uploadImages } from "@/services/imageService";
 import type {
@@ -10,6 +11,7 @@ import type {
   UploadedImage,
 } from "@/types/image";
 import type { UploadRawFile } from "element-plus";
+import type { ApiResponse } from "@/types/api";
 
 interface UploadState {
   candidates: UploadCandidate[];
@@ -37,6 +39,33 @@ const buildSummary = (
   success: responses.length,
   failed: candidates.length - responses.length,
 });
+
+type UploadErrorData = {
+  duplicates?: string[];
+};
+
+const extractUploadError = (error: unknown) => {
+  const fallback = {
+    message: "文件上传失败，请稍后再试",
+    duplicates: [] as string[],
+  };
+
+  if (isAxiosError<ApiResponse<UploadErrorData>>(error)) {
+    const payload = error.response?.data;
+    const duplicatesData = payload?.data?.duplicates;
+    const duplicates = Array.isArray(duplicatesData) ? duplicatesData : [];
+    return {
+      message: payload?.message || error.message || fallback.message,
+      duplicates,
+    };
+  }
+
+  if (error instanceof Error) {
+    return { message: error.message, duplicates: [] as string[] };
+  }
+
+  return fallback;
+};
 
 export const useImageUploadStore = defineStore("imageUpload", {
   state: defaultState,
@@ -120,21 +149,26 @@ export const useImageUploadStore = defineStore("imageUpload", {
 
         ElMessage.success(`上传成功 ${response.length} 张图片`);
       } catch (error) {
+        const { message, duplicates } = extractUploadError(error);
+        const duplicateSet = new Set(duplicates);
+
         // mark only the attempted candidates as error
         this.candidates = this.candidates.map((candidate) =>
           uploadIds.includes(candidate.id)
             ? {
                 ...candidate,
                 status: "error",
-                errorMessage:
-                  error instanceof Error ? error.message : "上传失败",
+                errorMessage: duplicateSet.has(candidate.file.name)
+                  ? `${message}：${candidate.file.name}`
+                  : message,
               }
             : candidate
         );
         this.summary = buildSummary(readyCandidates, []);
-        ElMessage.error(
-          error instanceof Error ? error.message : "文件上传失败，请稍后再试"
-        );
+        const detail = duplicates.length
+          ? `${message}：${duplicates.join("、")}`
+          : message;
+        ElMessage.error(detail);
       } finally {
         this.isUploading = false;
       }
