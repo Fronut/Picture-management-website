@@ -15,12 +15,16 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.io.FilenameUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class FileStorageService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(FileStorageService.class);
 
     private final FileStorageProperties properties;
     private Path rootLocation;
@@ -107,5 +111,19 @@ public class FileStorageService {
     }
 
     public record StoredFileInfo(String originalFilename, String storedFilename, String absolutePath, long size, String contentType) {
+    }
+
+    public void deleteFile(String absolutePath) {
+        if (!StringUtils.hasText(absolutePath)) {
+            return;
+        }
+        try {
+            Path path = Paths.get(absolutePath);
+            if (Files.deleteIfExists(path)) {
+                return;
+            }
+        } catch (IOException ex) {
+            LOGGER.warn("Failed to delete file {}: {}", absolutePath, ex.getMessage());
+        }
     }
 }

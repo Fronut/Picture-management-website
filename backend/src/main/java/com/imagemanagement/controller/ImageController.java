@@ -2,6 +2,7 @@ package com.imagemanagement.controller;
 
 import com.imagemanagement.dto.request.ImageSearchRequest;
 import com.imagemanagement.dto.response.ApiResponse;
+import com.imagemanagement.dto.response.ImageDeleteResponse;
 import com.imagemanagement.dto.response.ImageSummaryResponse;
 import com.imagemanagement.dto.response.ImageUploadResponse;
 import com.imagemanagement.dto.response.PageResponse;
@@ -13,6 +14,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -51,5 +54,14 @@ public class ImageController {
         CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
         PageResponse<ImageSummaryResponse> page = imageService.searchImages(principal.getId(), request);
         return ResponseEntity.ok(ApiResponse.success(page));
+    }
+
+    @DeleteMapping("/{imageId}")
+    public ResponseEntity<ApiResponse<ImageDeleteResponse>> deleteImage(
+            @PathVariable Long imageId,
+            Authentication authentication) {
+        CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
+        ImageDeleteResponse response = imageService.deleteImage(principal.getId(), imageId);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 }

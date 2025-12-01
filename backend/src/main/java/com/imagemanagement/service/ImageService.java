@@ -1,6 +1,7 @@
 package com.imagemanagement.service;
 
 import com.imagemanagement.dto.request.ImageSearchRequest;
+import com.imagemanagement.dto.response.ImageDeleteResponse;
 import com.imagemanagement.dto.response.ImageSummaryResponse;
 import com.imagemanagement.dto.response.ImageUploadResponse;
 import com.imagemanagement.dto.response.PageResponse;
@@ -13,4 +14,6 @@ public interface ImageService {
     List<ImageUploadResponse> uploadImages(Long userId, List<MultipartFile> files, ImagePrivacyLevel privacyLevel, String description);
 
     PageResponse<ImageSummaryResponse> searchImages(Long userId, ImageSearchRequest request);
+
+    ImageDeleteResponse deleteImage(Long userId, Long imageId);
 }
