@@ -121,5 +121,8 @@ export const useImageUploadStore = defineStore("imageUpload", {
         this.isUploading = false;
       }
     },
+    removeResultById(id: number) {
+      this.results = this.results.filter((r) => r.id !== id);
+    },
   },
 });

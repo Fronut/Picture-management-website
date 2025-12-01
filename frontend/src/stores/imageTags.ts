@@ -8,6 +8,7 @@ import {
   fetchPopularTags,
   removeImageTag,
 } from "@/services/tagService";
+import { useImageUploadStore } from "@/stores/imageUpload";
 import type { AiTagSuggestionInput, ImageTag, TagSummary } from "@/types/tag";
 
 interface ImageTagState {
@@ -49,6 +50,23 @@ export const useImageTagStore = defineStore("imageTags", {
       try {
         this.tags = await fetchImageTags(targetId);
       } catch (error) {
+        // 如果后端返回图片不存在（被删除），从上传页中移除残留记录并提示用户
+        const anyErr: any = error;
+        const status = anyErr?.response?.status;
+        const msg = anyErr?.response?.data?.message ?? anyErr?.message;
+        if (status === 404 || /Image not found/i.test(msg)) {
+          ElMessage.warning("图片不存在或已被删除，已移除本地缓存记录");
+          try {
+            const uploadStore = useImageUploadStore();
+            uploadStore.removeResultById(Number(targetId));
+          } catch (e) {
+            // ignore
+          }
+          this.currentImageId = null;
+          this.tags = [];
+          return;
+        }
+
         ElMessage.error(
           error instanceof Error ? error.message : "获取标签失败"
         );

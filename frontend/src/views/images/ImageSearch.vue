@@ -261,6 +261,7 @@ import dayjs from "dayjs";
 import { ElMessage, ElMessageBox } from "element-plus";
 
 import { useImageSearchStore } from "@/stores/imageSearch";
+import { useImageUploadStore } from "@/stores/imageUpload";
 import type { ImageSearchResult, ImageSearchPayload } from "@/types/image";
 import {
   downloadOriginalImage,
@@ -270,6 +271,7 @@ import {
 
 const router = useRouter();
 const store = useImageSearchStore();
+const uploadStore = useImageUploadStore();
 const sortValue = ref(`${store.filters.sortBy}|${store.filters.sortDirection}`);
 
 const localFilters = reactive({ ...store.filters });
@@ -472,6 +474,12 @@ const handleDeleteImage = async (image: ImageSearchResult) => {
     deletingId.value = image.id;
     await deleteImage(image.id);
     ElMessage.success("删除成功");
+    // 同步清理上传页中的残留记录（如果用户刚刚上传过这张图片）
+    try {
+      uploadStore.removeResultById(image.id);
+    } catch (e) {
+      // ignore
+    }
     await store.refreshCurrentPage();
   } catch (error) {
     ElMessage.error(
