@@ -67,6 +67,11 @@ export interface ImageSearchResult {
   thumbnails: ImageSummaryThumbnail[];
 }
 
+export interface ImageDeleteResult {
+  deletedImageId: number;
+  deleteTime: string;
+}
+
 export interface UploadCandidate {
   id: string;
   file: File;

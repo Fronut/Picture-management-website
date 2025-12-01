@@ -1,6 +1,7 @@
 import apiClient from "./apiClient";
 import type { ApiResponse, PageResponse } from "@/types/api";
 import type {
+  ImageDeleteResult,
   ImageSearchPayload,
   ImageSearchResult,
   ImageUploadPayload,
@@ -79,6 +80,20 @@ export const downloadOriginalImage = async (imageId: number): Promise<Blob> => {
     }
   );
   return data;
+};
+
+export const deleteImage = async (
+  imageId: number
+): Promise<ImageDeleteResult> => {
+  const { data } = await apiClient.delete<ApiResponse<ImageDeleteResult>>(
+    `${IMAGE_BASE}/${imageId}`
+  );
+
+  if (!data.data) {
+    throw new Error(data.message || "删除失败");
+  }
+
+  return data.data;
 };
 
 const normalizeSearchPayload = (payload: ImageSearchPayload) => ({

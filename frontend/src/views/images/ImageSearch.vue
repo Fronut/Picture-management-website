@@ -194,13 +194,24 @@
                       </el-descriptions-item>
                     </el-descriptions>
                     <div class="card-actions">
-                      <el-button
-                        text
-                        size="small"
-                        @click="goToTagManager(image.id)"
-                      >
-                        管理标签
-                      </el-button>
+                      <el-space>
+                        <el-button
+                          text
+                          type="danger"
+                          size="small"
+                          :loading="deletingId === image.id"
+                          @click="handleDeleteImage(image)"
+                        >
+                          删除
+                        </el-button>
+                        <el-button
+                          text
+                          size="small"
+                          @click="goToTagManager(image.id)"
+                        >
+                          管理标签
+                        </el-button>
+                      </el-space>
                       <el-tag
                         size="small"
                         :type="
@@ -247,13 +258,14 @@ import {
 } from "vue";
 import { useRouter } from "vue-router";
 import dayjs from "dayjs";
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 
 import { useImageSearchStore } from "@/stores/imageSearch";
 import type { ImageSearchResult, ImageSearchPayload } from "@/types/image";
 import {
   downloadOriginalImage,
   downloadThumbnail,
+  deleteImage,
 } from "@/services/imageService";
 
 const router = useRouter();
@@ -272,6 +284,7 @@ const pagination = computed(() => store.pagination);
 const filters = computed(() => store.filters);
 const loading = computed(() => store.loading);
 const hasResults = computed(() => store.hasResults);
+const deletingId = ref<number | null>(null);
 
 const thumbnailSrcMap = reactive<Record<number, string>>({});
 const originalSrcMap = reactive<Record<number, string>>({});
@@ -438,6 +451,35 @@ const thumbnailUrl = (image: ImageSearchResult) => {
 
 const goToTagManager = (imageId: number) => {
   router.push({ name: "image-tags", params: { imageId } });
+};
+
+const handleDeleteImage = async (image: ImageSearchResult) => {
+  try {
+    await ElMessageBox.confirm(
+      `删除后将无法恢复，确认删除「${image.originalFilename}」吗？`,
+      "删除确认",
+      {
+        type: "warning",
+        confirmButtonText: "删除",
+        cancelButtonText: "取消",
+      }
+    );
+  } catch {
+    return;
+  }
+
+  try {
+    deletingId.value = image.id;
+    await deleteImage(image.id);
+    ElMessage.success("删除成功");
+    await store.refreshCurrentPage();
+  } catch (error) {
+    ElMessage.error(
+      error instanceof Error ? error.message : "删除失败，请稍后再试"
+    );
+  } finally {
+    deletingId.value = null;
+  }
 };
 
 watch(

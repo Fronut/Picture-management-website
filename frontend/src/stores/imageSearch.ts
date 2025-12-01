@@ -125,5 +125,10 @@ export const useImageSearchStore = defineStore("imageSearch", {
       this.filters.sortDirection = direction;
       await this.fetch(0);
     },
+
+    async refreshCurrentPage() {
+      const currentPage = this.filters.page ?? this.pagination.pageNumber ?? 0;
+      await this.fetch(currentPage);
+    },
   },
 });
