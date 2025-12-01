@@ -47,9 +47,18 @@ export const useImageUploadStore = defineStore("imageUpload", {
   actions: {
     addFiles(files: Array<File | UploadRawFile>) {
       files.forEach((file) => {
+        const f = file as File;
+        // avoid exact duplicate entries (same name + size) in candidates
+        const exists = this.candidates.some(
+          (c) => c.file.name === f.name && c.file.size === f.size
+        );
+        if (exists) {
+          ElMessage.info(`${f.name} 已在待上传列表，已跳过重复添加`);
+          return;
+        }
         const candidate: UploadCandidate = {
           id: uuid(),
-          file: file as File,
+          file: f,
           status: "ready",
         };
         this.candidates.push(candidate);
@@ -77,18 +86,21 @@ export const useImageUploadStore = defineStore("imageUpload", {
         ElMessage.warning("请先选择要上传的图片");
         return;
       }
-
       const filesToUpload = readyCandidates.map((candidate) => candidate.file);
+
+      // ids of candidates that will be uploaded
+      const uploadIds = readyCandidates.map((c) => c.id);
 
       this.isUploading = true;
       this.summary = null;
       this.results = [];
 
-      this.candidates = this.candidates.map((candidate) => ({
-        ...candidate,
-        status: "uploading",
-        errorMessage: undefined,
-      }));
+      // mark only the ready candidates as uploading
+      this.candidates = this.candidates.map((candidate) =>
+        uploadIds.includes(candidate.id)
+          ? { ...candidate, status: "uploading", errorMessage: undefined }
+          : candidate
+      );
 
       try {
         const response = await uploadImages({
@@ -98,22 +110,47 @@ export const useImageUploadStore = defineStore("imageUpload", {
         });
 
         this.results = response;
-        this.summary = buildSummary(this.candidates, response);
+        // build summary based on the uploaded batch
+        this.summary = buildSummary(readyCandidates, response);
 
-        this.candidates = this.candidates.map((candidate) => ({
-          ...candidate,
-          status: "success",
-          errorMessage: undefined,
-        }));
+        // Map successful responses back to candidates by filename+size
+        const successSet = new Set<string>();
+        response.forEach((r) =>
+          successSet.add(`${r.originalFilename}::${r.fileSize}`)
+        );
+
+        // Update candidates: remove those that succeeded; mark those that did not as error
+        this.candidates = this.candidates.flatMap((candidate) => {
+          if (!uploadIds.includes(candidate.id)) return [candidate];
+          const key = `${candidate.file.name}::${candidate.file.size}`;
+          if (successSet.has(key)) {
+            // uploaded successfully -> remove from candidate list
+            return [];
+          }
+          // failed to upload (backend didn't return it)
+          return [
+            {
+              ...candidate,
+              status: "error",
+              errorMessage: "上传失败（服务器未返回成功信息）",
+            },
+          ];
+        });
 
         ElMessage.success(`上传成功 ${response.length} 张图片`);
       } catch (error) {
-        this.candidates = this.candidates.map((candidate) => ({
-          ...candidate,
-          status: "error",
-          errorMessage: error instanceof Error ? error.message : "上传失败",
-        }));
-        this.summary = buildSummary(this.candidates, []);
+        // mark only the attempted candidates as error
+        this.candidates = this.candidates.map((candidate) =>
+          uploadIds.includes(candidate.id)
+            ? {
+                ...candidate,
+                status: "error",
+                errorMessage:
+                  error instanceof Error ? error.message : "上传失败",
+              }
+            : candidate
+        );
+        this.summary = buildSummary(readyCandidates, []);
         ElMessage.error(
           error instanceof Error ? error.message : "文件上传失败，请稍后再试"
         );
