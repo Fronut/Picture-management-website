@@ -46,6 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
+@SuppressWarnings({"null"})
 class TagControllerIntegrationTest {
 
     @Autowired
