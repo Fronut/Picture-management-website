@@ -1,7 +1,11 @@
 export type ImagePrivacyLevel = "PUBLIC" | "PRIVATE";
 
+// For search payloads we allow an explicit 'ALL' token to represent no filtering
+export type ImageSearchPrivacy = ImagePrivacyLevel | "ALL";
+
 export interface ImageUploadPayload {
   files: File[];
+  // uploads only accept real privacy levels
   privacyLevel?: ImagePrivacyLevel;
   description?: string;
 }
@@ -22,7 +26,8 @@ export type SortDirection = "ASC" | "DESC";
 
 export interface ImageSearchPayload {
   keyword?: string;
-  privacyLevel?: ImagePrivacyLevel;
+  // search may use 'ALL' token to represent no filtering
+  privacyLevel?: ImageSearchPrivacy;
   tags?: string[];
   uploadedFrom?: string;
   uploadedTo?: string;

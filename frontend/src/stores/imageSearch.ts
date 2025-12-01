@@ -27,6 +27,8 @@ export interface ImageSearchState {
 const defaultFilters: ImageSearchPayload = {
   keyword: "",
   tags: [],
+  // 'ALL' means no privacy filter applied
+  privacyLevel: "ALL",
   onlyOwn: false,
   size: 20,
   page: 0,

@@ -94,7 +94,11 @@ public final class ImageSpecifications {
         }
 
         if (request.getPrivacyLevel() == ImagePrivacyLevel.PRIVATE) {
-            return cb.equal(ownerIdPath, userId);
+            // Only return images that are private and owned by the current user
+            return cb.and(
+                    cb.equal(privacyPath, ImagePrivacyLevel.PRIVATE),
+                    cb.equal(ownerIdPath, userId)
+            );
         }
 
         if (request.getPrivacyLevel() == ImagePrivacyLevel.PUBLIC) {
