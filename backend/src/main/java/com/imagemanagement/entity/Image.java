@@ -56,6 +56,9 @@ public class Image {
     @Column(name = "file_size", nullable = false)
     private Long fileSize;
 
+    @Column(name = "content_hash", length = 128)
+    private String contentHash;
+
     @Column(name = "mime_type", nullable = false, length = 50)
     private String mimeType;
 
@@ -155,6 +158,14 @@ public class Image {
 
     public void setFileSize(Long fileSize) {
         this.fileSize = fileSize;
+    }
+
+    public String getContentHash() {
+        return contentHash;
+    }
+
+    public void setContentHash(String contentHash) {
+        this.contentHash = contentHash;
     }
 
     public String getMimeType() {

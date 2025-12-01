@@ -27,12 +27,17 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.HexFormat;
 import javax.imageio.ImageIO;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -86,10 +91,36 @@ public class ImageServiceImpl implements ImageService {
                 .orElseThrow(() -> new BadRequestException("User not found"));
 
         List<Image> imagesToSave = new ArrayList<>();
+        List<PendingUpload> pendingUploads = new ArrayList<>();
+        Set<String> hashesInRequest = new HashSet<>();
+        LinkedHashSet<String> duplicatedFilenames = new LinkedHashSet<>();
 
         for (MultipartFile file : files) {
-            FileStorageService.StoredFileInfo storedFile = fileStorageService.storeFile(file, userId);
-            Image image = buildImageEntity(user, storedFile, privacyLevel, description);
+            String contentHash = calculateContentHash(file);
+            String filename = StringUtils.hasText(file.getOriginalFilename())
+                    ? Objects.requireNonNull(file.getOriginalFilename())
+                    : "当前文件";
+
+            if (!hashesInRequest.add(contentHash)) {
+                duplicatedFilenames.add(filename);
+                continue;
+            }
+
+            if (imageRepository.existsByUser_IdAndContentHash(userId, contentHash)) {
+                duplicatedFilenames.add(filename);
+                continue;
+            }
+
+            pendingUploads.add(new PendingUpload(file, contentHash));
+        }
+
+        if (!duplicatedFilenames.isEmpty()) {
+            throw new BadRequestException("以下文件已上传过，无法重复上传：" + String.join(", ", duplicatedFilenames));
+        }
+
+        for (PendingUpload pendingUpload : pendingUploads) {
+            FileStorageService.StoredFileInfo storedFile = fileStorageService.storeFile(pendingUpload.file(), userId);
+            Image image = buildImageEntity(user, storedFile, privacyLevel, description, pendingUpload.contentHash());
             imagesToSave.add(image);
         }
 
@@ -139,13 +170,14 @@ public class ImageServiceImpl implements ImageService {
     }
 
     private Image buildImageEntity(User user, FileStorageService.StoredFileInfo storedFile,
-                                   ImagePrivacyLevel privacyLevel, String description) {
+                                   ImagePrivacyLevel privacyLevel, String description, String contentHash) {
         Image image = new Image();
         image.setUser(user);
         image.setOriginalFilename(storedFile.originalFilename());
         image.setStoredFilename(storedFile.storedFilename());
         image.setFilePath(storedFile.absolutePath());
         image.setFileSize(storedFile.size());
+        image.setContentHash(contentHash);
         image.setMimeType(storedFile.contentType());
         image.setDescription(description);
         image.setPrivacyLevel(privacyLevel != null ? privacyLevel : ImagePrivacyLevel.PUBLIC);
@@ -289,5 +321,24 @@ public class ImageServiceImpl implements ImageService {
                     .filter(StringUtils::hasText)
                     .forEach(fileStorageService::deleteFile);
         }
+    }
+
+    private String calculateContentHash(MultipartFile file) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] buffer = new byte[8192];
+            try (var inputStream = file.getInputStream()) {
+                int read;
+                while ((read = inputStream.read(buffer)) != -1) {
+                    digest.update(buffer, 0, read);
+                }
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (IOException | NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("Failed to calculate content hash", ex);
+        }
+    }
+
+    private record PendingUpload(MultipartFile file, String contentHash) {
     }
 }

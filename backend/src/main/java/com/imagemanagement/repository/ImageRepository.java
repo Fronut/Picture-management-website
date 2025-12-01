@@ -10,4 +10,6 @@ public interface ImageRepository extends JpaRepository<Image, Long>, JpaSpecific
 
 	@EntityGraph(attributePaths = {"user", "thumbnails"})
 	Optional<Image> findWithUserAndThumbnailsById(Long id);
+
+	boolean existsByUser_IdAndContentHash(Long userId, String contentHash);
 }

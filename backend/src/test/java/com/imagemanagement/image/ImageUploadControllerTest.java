@@ -23,6 +23,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -33,6 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.imageio.ImageIO;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasToString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -87,11 +90,7 @@ class ImageUploadControllerTest {
         User user = persistUser();
         String token = loginAndGetToken();
 
-        MockMultipartFile file = new MockMultipartFile(
-                "files",
-                "sample.png",
-                "image/png",
-                createPngBytes());
+        MockMultipartFile file = buildMockFile("sample.png");
 
         mockMvc.perform(multipart("/api/images/upload")
                         .file(file)
@@ -112,6 +111,41 @@ class ImageUploadControllerTest {
         try (var stream = Files.list(uploadDir.resolve(String.valueOf(user.getId())))) {
             assertThat(stream.count()).isEqualTo(1);
         }
+    }
+
+    @Test
+    @SuppressWarnings("null")
+    void uploadImages_shouldRejectDuplicateFilesForSameUser() throws Exception {
+        persistUser();
+        String token = loginAndGetToken();
+
+        MockMultipartFile file = buildMockFile("duplicate.png");
+
+        mockMvc.perform(multipart("/api/images/upload")
+                        .file(file)
+                        .param("privacyLevel", "PRIVATE")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(Objects.requireNonNull(MediaType.MULTIPART_FORM_DATA)))
+                .andExpect(status().isOk());
+
+        MockMultipartFile duplicateFile = buildMockFile("duplicate.png");
+
+        mockMvc.perform(multipart("/api/images/upload")
+                .file(duplicateFile)
+                .param("privacyLevel", "PRIVATE")
+                .header("Authorization", "Bearer " + token)
+                .contentType(Objects.requireNonNull(MediaType.MULTIPART_FORM_DATA)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message", hasToString(containsString("duplicate.png"))));
+    }
+
+    @NonNull
+    private MockMultipartFile buildMockFile(String filename) throws IOException {
+        return new MockMultipartFile(
+                "files",
+                filename,
+                "image/png",
+                createPngBytes());
     }
 
     private User persistUser() {
