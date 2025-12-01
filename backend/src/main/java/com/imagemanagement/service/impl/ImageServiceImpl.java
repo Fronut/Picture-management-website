@@ -2,6 +2,7 @@ package com.imagemanagement.service.impl;
 
 import com.imagemanagement.cache.CacheNames;
 import com.imagemanagement.dto.request.ImageSearchRequest;
+import com.imagemanagement.dto.response.ImageDeleteResponse;
 import com.imagemanagement.dto.response.ImageSummaryResponse;
 import com.imagemanagement.dto.response.ImageUploadResponse;
 import com.imagemanagement.dto.response.PageResponse;
@@ -11,6 +12,8 @@ import com.imagemanagement.entity.Thumbnail;
 import com.imagemanagement.entity.User;
 import com.imagemanagement.entity.enums.ImagePrivacyLevel;
 import com.imagemanagement.exception.BadRequestException;
+import com.imagemanagement.exception.ForbiddenException;
+import com.imagemanagement.exception.ResourceNotFoundException;
 import com.imagemanagement.repository.ImageRepository;
 import com.imagemanagement.repository.UserRepository;
 import com.imagemanagement.repository.specification.ImageSpecifications;
@@ -24,6 +27,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -110,6 +114,28 @@ public class ImageServiceImpl implements ImageService {
         Specification<Image> specification = Objects.requireNonNull(ImageSpecifications.build(criteria, userId));
         Page<Image> images = imageRepository.findAll(specification, pageable);
         return PageResponse.from(images.map(this::toSummaryResponse));
+    }
+
+    @Override
+    @CacheEvict(value = CacheNames.IMAGE_SEARCH, allEntries = true)
+    public ImageDeleteResponse deleteImage(Long userId, Long imageId) {
+        if (userId == null) {
+            throw new BadRequestException("User id is required");
+        }
+        if (imageId == null) {
+            throw new BadRequestException("Image id is required");
+        }
+
+        Image image = imageRepository.findWithUserAndThumbnailsById(imageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Image not found"));
+
+        if (!Objects.equals(image.getUser().getId(), userId)) {
+            throw new ForbiddenException("You do not have permission to delete this image");
+        }
+
+        removeStoredFiles(image);
+        imageRepository.delete(image);
+        return new ImageDeleteResponse(imageId, Instant.now());
     }
 
     private Image buildImageEntity(User user, FileStorageService.StoredFileInfo storedFile,
@@ -252,5 +278,16 @@ public class ImageServiceImpl implements ImageService {
             return null;
         }
         return "/api/images/" + imageId + "/thumbnails/" + thumbnailId;
+    }
+
+    private void removeStoredFiles(Image image) {
+        fileStorageService.deleteFile(image.getFilePath());
+        if (!CollectionUtils.isEmpty(image.getThumbnails())) {
+            image.getThumbnails()
+                    .stream()
+                    .map(Thumbnail::getFilePath)
+                    .filter(StringUtils::hasText)
+                    .forEach(fileStorageService::deleteFile);
+        }
     }
 }
