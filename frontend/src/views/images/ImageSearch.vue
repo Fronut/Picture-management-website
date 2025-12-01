@@ -332,7 +332,7 @@ const syncLocalFilters = (source: Partial<ImageSearchPayload>) => {
   // remove keys not present in source so localFilters doesn't keep stale values
   Object.keys(localFilters).forEach((k) => {
     if (!(k in source)) {
-      // @ts-ignore
+      // @ts-expect-error - dynamic deletion of keys on reactive object
       delete localFilters[k];
     }
   });
