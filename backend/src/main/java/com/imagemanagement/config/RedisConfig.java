@@ -1,8 +1,10 @@
 package com.imagemanagement.config;
 
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.imagemanagement.cache.CacheNames;
 import java.time.Duration;
 import java.util.HashMap;
@@ -70,6 +72,11 @@ public class RedisConfig {
                 .findAndAddModules()
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .build();
+        BasicPolymorphicTypeValidator validator = BasicPolymorphicTypeValidator.builder()
+            .allowIfSubType("com.imagemanagement")
+            .allowIfSubType("java.time")
+            .build();
+        mapper.activateDefaultTyping(validator, ObjectMapper.DefaultTyping.NON_FINAL, JsonTypeInfo.As.PROPERTY);
         return new GenericJackson2JsonRedisSerializer(Objects.requireNonNull(mapper));
     }
 }
