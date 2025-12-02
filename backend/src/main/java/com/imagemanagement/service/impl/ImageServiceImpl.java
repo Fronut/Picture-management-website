@@ -1,6 +1,7 @@
 package com.imagemanagement.service.impl;
 
 import com.imagemanagement.cache.CacheNames;
+import com.imagemanagement.dto.request.ImageEditRequest;
 import com.imagemanagement.dto.request.ImageSearchRequest;
 import com.imagemanagement.dto.response.ImageDeleteResponse;
 import com.imagemanagement.dto.response.ImageSummaryResponse;
@@ -23,8 +24,11 @@ import com.imagemanagement.service.ImageService;
 import com.imagemanagement.service.TagService;
 import com.imagemanagement.service.ThumbnailService;
 import jakarta.transaction.Transactional;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.awt.image.RescaleOp;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -36,6 +40,7 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Locale;
 import java.util.Set;
 import java.util.HexFormat;
 import javax.imageio.ImageIO;
@@ -46,6 +51,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.apache.commons.io.FilenameUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
@@ -168,6 +174,48 @@ public class ImageServiceImpl implements ImageService {
         removeStoredFiles(image);
         imageRepository.delete(image);
         return new ImageDeleteResponse(imageId, Instant.now());
+    }
+
+    @Override
+    @CacheEvict(value = CacheNames.IMAGE_SEARCH, allEntries = true)
+    public ImageSummaryResponse editImage(Long userId, Long imageId, ImageEditRequest request) {
+        if (userId == null) {
+            throw new BadRequestException("User id is required");
+        }
+        if (imageId == null) {
+            throw new BadRequestException("Image id is required");
+        }
+        if (request == null || !request.hasAnyOperation()) {
+            throw new BadRequestException("No edit operation was provided");
+        }
+
+        Image image = imageRepository.findWithUserAndThumbnailsById(imageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Image not found"));
+
+        if (!Objects.equals(image.getUser().getId(), userId)) {
+            throw new ForbiddenException("You do not have permission to edit this image");
+        }
+
+        if (!StringUtils.hasText(image.getFilePath())) {
+            throw new IllegalStateException("Image file path is missing");
+        }
+
+        Path imagePath = Path.of(image.getFilePath());
+        BufferedImage workingImage = readImageForEditing(imagePath);
+
+        if (request.getCrop() != null) {
+            workingImage = applyCrop(workingImage, request.getCrop());
+        }
+
+        if (request.getToneAdjustment() != null && request.getToneAdjustment().hasAdjustments()) {
+            workingImage = applyToneAdjustment(workingImage, request.getToneAdjustment());
+        }
+
+        writeImage(workingImage, imagePath, resolveOutputFormat(image));
+        updateImageMetadata(image, workingImage, imagePath);
+        refreshThumbnails(image);
+
+        return toSummaryResponse(image);
     }
 
     private Image buildImageEntity(User user, FileStorageService.StoredFileInfo storedFile,
@@ -324,15 +372,183 @@ public class ImageServiceImpl implements ImageService {
         }
     }
 
+    private BufferedImage readImageForEditing(Path imagePath) {
+        try {
+            BufferedImage bufferedImage = ImageIO.read(imagePath.toFile());
+            if (bufferedImage == null) {
+                throw new BadRequestException("Unsupported image format");
+            }
+            return convertToEditableType(bufferedImage);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to read image content", ex);
+        }
+    }
+
+    private BufferedImage applyCrop(BufferedImage source, ImageEditRequest.CropOperation crop) {
+        int x = crop.getX();
+        int y = crop.getY();
+        int width = crop.getWidth();
+        int height = crop.getHeight();
+
+        if (x + width > source.getWidth() || y + height > source.getHeight()) {
+            throw new BadRequestException("Crop area exceeds image bounds");
+        }
+
+        BufferedImage cropped = source.getSubimage(x, y, width, height);
+        return deepCopy(cropped);
+    }
+
+    private BufferedImage applyToneAdjustment(BufferedImage source, ImageEditRequest.ToneAdjustment tone) {
+        BufferedImage working = deepCopy(source);
+        float brightness = tone.getBrightness() != null ? tone.getBrightness().floatValue() : 0f;
+        float contrast = tone.getContrast() != null ? tone.getContrast().floatValue() : 0f;
+        float warmth = tone.getWarmth() != null ? tone.getWarmth().floatValue() : 0f;
+
+        if (brightness != 0f || contrast != 0f) {
+            float scale = Math.max(0.1f, 1f + contrast);
+            float offset = brightness * 255f;
+            float[] scales = new float[]{scale, scale, scale, 1f};
+            float[] offsets = new float[]{offset, offset, offset, 0f};
+            RescaleOp rescaleOp = new RescaleOp(scales, offsets, null);
+            working = rescaleOp.filter(working, null);
+        }
+
+        if (warmth != 0f) {
+            applyWarmthShift(working, warmth);
+        }
+
+        return working;
+    }
+
+    private void applyWarmthShift(BufferedImage image, float warmth) {
+        int width = image.getWidth();
+        int height = image.getHeight();
+        float redDelta = warmth * 25f;
+        float blueDelta = -warmth * 25f;
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int argb = image.getRGB(x, y);
+                int alpha = (argb >>> 24) & 0xFF;
+                int red = (argb >>> 16) & 0xFF;
+                int green = (argb >>> 8) & 0xFF;
+                int blue = argb & 0xFF;
+
+                red = clampColor(red + redDelta);
+                blue = clampColor(blue + blueDelta);
+
+                int adjusted = (alpha << 24)
+                        | (red << 16)
+                        | (green << 8)
+                        | blue;
+                image.setRGB(x, y, adjusted);
+            }
+        }
+    }
+
+    private int clampColor(float channel) {
+        return Math.min(255, Math.max(0, Math.round(channel)));
+    }
+
+    private void writeImage(BufferedImage image, Path targetPath, String format) {
+        try {
+            BufferedImage output = image;
+            String normalizedFormat = format != null ? format.toLowerCase(Locale.ROOT) : "jpg";
+            if ("jpg".equals(normalizedFormat) || "jpeg".equals(normalizedFormat)) {
+                BufferedImage rgbImage = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
+                Graphics2D graphics = rgbImage.createGraphics();
+                graphics.drawImage(image, 0, 0, null);
+                graphics.dispose();
+                output = rgbImage;
+            }
+
+            if (!ImageIO.write(output, normalizedFormat, targetPath.toFile())) {
+                throw new IllegalStateException("Failed to persist edited image");
+            }
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to persist edited image", ex);
+        }
+    }
+
+    private String resolveOutputFormat(Image image) {
+        String extension = FilenameUtils.getExtension(image.getStoredFilename());
+        if (StringUtils.hasText(extension)) {
+            return extension.toLowerCase(Locale.ROOT);
+        }
+        if (StringUtils.hasText(image.getMimeType())) {
+            String mime = image.getMimeType().toLowerCase(Locale.ROOT);
+            if (mime.contains("png")) {
+                return "png";
+            }
+        }
+        return "jpg";
+    }
+
+    private BufferedImage convertToEditableType(BufferedImage source) {
+        if (source.getType() == BufferedImage.TYPE_INT_ARGB) {
+            return source;
+        }
+        return deepCopy(source);
+    }
+
+    private BufferedImage deepCopy(BufferedImage source) {
+        BufferedImage copy = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = copy.createGraphics();
+        graphics.drawImage(source, 0, 0, null);
+        graphics.dispose();
+        return copy;
+    }
+
+    private void updateImageMetadata(Image image, BufferedImage bufferedImage, Path imagePath) {
+        image.setWidth(bufferedImage.getWidth());
+        image.setHeight(bufferedImage.getHeight());
+        try {
+            image.setFileSize(Files.size(imagePath));
+            image.setContentHash(calculateContentHash(imagePath));
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to update image metadata", ex);
+        }
+    }
+
+    private void refreshThumbnails(Image image) {
+        if (image == null) {
+            return;
+        }
+        if (!CollectionUtils.isEmpty(image.getThumbnails())) {
+            List<Thumbnail> existing = new ArrayList<>(image.getThumbnails());
+            for (Thumbnail thumbnail : existing) {
+                if (thumbnail != null && StringUtils.hasText(thumbnail.getFilePath())) {
+                    fileStorageService.deleteFile(thumbnail.getFilePath());
+                }
+                image.removeThumbnail(thumbnail);
+            }
+        }
+        thumbnailService.generateThumbnails(image);
+    }
+
     private String calculateContentHash(MultipartFile file) {
+        try (InputStream inputStream = file.getInputStream()) {
+            return calculateContentHash(inputStream);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to calculate content hash", ex);
+        }
+    }
+
+    private String calculateContentHash(Path path) {
+        try (InputStream inputStream = Files.newInputStream(path)) {
+            return calculateContentHash(inputStream);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to calculate content hash", ex);
+        }
+    }
+
+    private String calculateContentHash(InputStream inputStream) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] buffer = new byte[8192];
-            try (var inputStream = file.getInputStream()) {
-                int read;
-                while ((read = inputStream.read(buffer)) != -1) {
-                    digest.update(buffer, 0, read);
-                }
+            int read;
+            while ((read = inputStream.read(buffer)) != -1) {
+                digest.update(buffer, 0, read);
             }
             return HexFormat.of().formatHex(digest.digest());
         } catch (IOException | NoSuchAlgorithmException ex) {
