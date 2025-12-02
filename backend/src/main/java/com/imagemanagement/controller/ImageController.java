@@ -1,5 +1,6 @@
 package com.imagemanagement.controller;
 
+import com.imagemanagement.dto.request.ImageEditRequest;
 import com.imagemanagement.dto.request.ImageSearchRequest;
 import com.imagemanagement.dto.response.ApiResponse;
 import com.imagemanagement.dto.response.ImageDeleteResponse;
@@ -54,6 +55,17 @@ public class ImageController {
         CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
         PageResponse<ImageSummaryResponse> page = imageService.searchImages(principal.getId(), request);
         return ResponseEntity.ok(ApiResponse.success(page));
+    }
+
+    @PostMapping(value = "/{imageId}/edit", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<ImageSummaryResponse>> editImage(
+            @PathVariable Long imageId,
+            @Valid @RequestBody ImageEditRequest request,
+            Authentication authentication) {
+
+        CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
+        ImageSummaryResponse response = imageService.editImage(principal.getId(), imageId, request);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @DeleteMapping("/{imageId}")

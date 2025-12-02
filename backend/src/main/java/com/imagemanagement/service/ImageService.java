@@ -1,5 +1,6 @@
 package com.imagemanagement.service;
 
+import com.imagemanagement.dto.request.ImageEditRequest;
 import com.imagemanagement.dto.request.ImageSearchRequest;
 import com.imagemanagement.dto.response.ImageDeleteResponse;
 import com.imagemanagement.dto.response.ImageSummaryResponse;
@@ -16,4 +17,6 @@ public interface ImageService {
     PageResponse<ImageSummaryResponse> searchImages(Long userId, ImageSearchRequest request);
 
     ImageDeleteResponse deleteImage(Long userId, Long imageId);
+
+    ImageSummaryResponse editImage(Long userId, Long imageId, ImageEditRequest request);
 }
