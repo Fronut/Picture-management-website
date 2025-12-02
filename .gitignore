@@ -161,3 +161,45 @@ backend/thumbnails/
 *.pth
 *.pt
 *.h5
+
+### Python / AI-service ###
+# Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Pytest cache
+.pytest_cache/
+
+# Mypy cache
+.mypy_cache/
+
+# pip / wheel
+*.egg-info/
+dist/
+build/
+
+# Conda env files
+*.conda
+
+# AI service artifacts / models
+/ai-service/models/
+ai-service/models/
+ai-service/.venv/
+ai-service/__pycache__/
+ai-service/**/*.pyc
+ai-service/*.pyc
+ai-service/.pytest_cache/
+ai-service/*.egg-info/
+
+# Thumbnails at repo root
+thumbnails/
