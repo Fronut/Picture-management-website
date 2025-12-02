@@ -9,8 +9,7 @@ import com.imagemanagement.entity.enums.UserRole;
 import com.imagemanagement.entity.enums.UserStatus;
 import com.imagemanagement.repository.ImageRepository;
 import com.imagemanagement.repository.UserRepository;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
+import com.imagemanagement.support.TestImageResource;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,20 +17,19 @@ import java.util.Objects;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.lang.NonNull;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
-
-import javax.imageio.ImageIO;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
@@ -85,25 +83,32 @@ class ImageUploadControllerTest {
         deleteDirectory(thumbnailDir);
     }
 
-    @Test
-    void uploadImages_shouldPersistMetadataAndReturnResponse() throws Exception {
+        @ParameterizedTest
+        @ValueSource(strings = {"beach.jpeg", "man2.png", "tree.jpeg"})
+        void uploadImages_shouldPersistMetadataAndReturnResponse(String filename) throws Exception {
         User user = persistUser();
         String token = loginAndGetToken();
 
-        MockMultipartFile file = buildMockFile("sample.png");
+        TestImageResource testImage = TestImageResource.load(filename);
+        MockMultipartFile file = testImage.asMultipart("files");
 
         mockMvc.perform(multipart("/api/images/upload")
-                        .file(file)
+                .file(Objects.requireNonNull(file))
                         .param("privacyLevel", "PRIVATE")
                         .param("description", "test image")
                         .header("Authorization", "Bearer " + token)
                         .contentType(Objects.requireNonNull(MediaType.MULTIPART_FORM_DATA)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].originalFilename").value("sample.png"))
+            .andExpect(jsonPath("$.data[0].originalFilename").value(filename))
                 .andExpect(jsonPath("$.data[0].storedFilename").isNotEmpty());
 
         assertThat(imageRepository.count()).isEqualTo(1);
         Image storedImage = imageRepository.findAll().get(0);
+        assertThat(storedImage.getOriginalFilename()).isEqualTo(filename);
+        assertThat(storedImage.getMimeType()).isEqualTo(testImage.getMimeType());
+        assertThat(storedImage.getFileSize()).isEqualTo(testImage.getSize());
+        assertThat(storedImage.getWidth()).isEqualTo(testImage.getWidth());
+        assertThat(storedImage.getHeight()).isEqualTo(testImage.getHeight());
         assertThat(storedImage.getThumbnails()).hasSize(thumbnailProperties.getPresets().size());
         storedImage.getThumbnails().forEach(thumbnail ->
                 assertThat(Files.exists(Path.of(thumbnail.getFilePath()))).isTrue());
@@ -119,34 +124,26 @@ class ImageUploadControllerTest {
         persistUser();
         String token = loginAndGetToken();
 
-        MockMultipartFile file = buildMockFile("duplicate.png");
+        TestImageResource duplicateImage = TestImageResource.load("beach.jpeg");
+        MockMultipartFile file = duplicateImage.asMultipart("files");
 
         mockMvc.perform(multipart("/api/images/upload")
-                        .file(file)
+                        .file(Objects.requireNonNull(file))
                         .param("privacyLevel", "PRIVATE")
                         .header("Authorization", "Bearer " + token)
                         .contentType(Objects.requireNonNull(MediaType.MULTIPART_FORM_DATA)))
                 .andExpect(status().isOk());
 
-        MockMultipartFile duplicateFile = buildMockFile("duplicate.png");
+        MockMultipartFile duplicateFile = duplicateImage.asMultipart("files");
 
         mockMvc.perform(multipart("/api/images/upload")
-                .file(duplicateFile)
+            .file(Objects.requireNonNull(duplicateFile))
                 .param("privacyLevel", "PRIVATE")
                 .header("Authorization", "Bearer " + token)
                 .contentType(Objects.requireNonNull(MediaType.MULTIPART_FORM_DATA)))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.message", hasToString(containsString("duplicate.png"))))
-            .andExpect(jsonPath("$.data.duplicates[0]").value("duplicate.png"));
-    }
-
-    @NonNull
-    private MockMultipartFile buildMockFile(String filename) throws IOException {
-        return new MockMultipartFile(
-                "files",
-                filename,
-                "image/png",
-                createPngBytes());
+            .andExpect(jsonPath("$.message", hasToString(containsString("beach.jpeg"))))
+            .andExpect(jsonPath("$.data.duplicates[0]").value("beach.jpeg"));
     }
 
     private User persistUser() {
@@ -172,14 +169,6 @@ class ImageUploadControllerTest {
 
         JsonNode jsonNode = objectMapper.readTree(result.getResponse().getContentAsString());
         return jsonNode.path("data").path("token").asText();
-    }
-
-    private byte[] createPngBytes() throws IOException {
-        BufferedImage image = new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB);
-        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-            ImageIO.write(image, "png", outputStream);
-            return outputStream.toByteArray();
-        }
     }
 
     private void deleteDirectory(Path directory) throws IOException {

@@ -8,14 +8,12 @@ import com.imagemanagement.entity.enums.UserRole;
 import com.imagemanagement.entity.enums.UserStatus;
 import com.imagemanagement.repository.ImageRepository;
 import com.imagemanagement.repository.UserRepository;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
+import com.imagemanagement.support.TestImageResource;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
-import javax.imageio.ImageIO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -145,14 +143,11 @@ class ImageDeletionControllerTest {
     }
 
     private long uploadSampleImage(String token) throws Exception {
-        MockMultipartFile file = new MockMultipartFile(
-                "files",
-                "sample.png",
-                "image/png",
-                createPngBytes());
+        TestImageResource testImage = TestImageResource.load("road2.jpeg");
+        MockMultipartFile file = testImage.asMultipart("files");
 
         MvcResult result = mockMvc.perform(multipart("/api/images/upload")
-                        .file(file)
+                        .file(Objects.requireNonNull(file))
                         .header("Authorization", "Bearer " + token)
                         .contentType(Objects.requireNonNull(MediaType.MULTIPART_FORM_DATA)))
                 .andExpect(status().isOk())
@@ -160,14 +155,6 @@ class ImageDeletionControllerTest {
 
         JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
         return response.path("data").get(0).path("id").asLong();
-    }
-
-    private byte[] createPngBytes() throws IOException {
-        BufferedImage image = new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB);
-        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-            ImageIO.write(image, "png", outputStream);
-            return outputStream.toByteArray();
-        }
     }
 
     private void deleteDirectory(Path directory) throws IOException {

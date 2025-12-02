@@ -14,15 +14,22 @@ import com.imagemanagement.entity.enums.UserStatus;
 import com.imagemanagement.repository.ImageRepository;
 import com.imagemanagement.repository.TagRepository;
 import com.imagemanagement.repository.UserRepository;
+import com.imagemanagement.support.TestImageResource;
 import java.time.LocalDateTime;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,6 +38,7 @@ import org.springframework.lang.NonNull;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -61,11 +69,25 @@ class ImageSearchControllerTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Value("${app.file.upload-dir}")
+    private Path uploadDir;
+
+    @Value("${app.thumbnail.base-dir}")
+    private Path thumbnailDir;
+
     @BeforeEach
-    void setUp() {
+    void setUp() throws IOException {
         imageRepository.deleteAll();
         tagRepository.deleteAll();
         userRepository.deleteAll();
+        deleteDirectory(uploadDir);
+        deleteDirectory(thumbnailDir);
+    }
+
+    @AfterEach
+    void tearDown() throws IOException {
+        deleteDirectory(uploadDir);
+        deleteDirectory(thumbnailDir);
     }
 
     @Test
@@ -136,6 +158,33 @@ class ImageSearchControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    void searchImages_shouldFilterByActualWidthRangeFromRealUploads() throws Exception {
+        User owner = persistUser("real-owner", "real-owner@example.com");
+        String token = loginAndGetToken(owner.getUsername());
+
+        TestImageResource wideImage = TestImageResource.load("beach.jpeg");
+        TestImageResource portraitImage = TestImageResource.load("man2.png");
+
+        long wideImageId = uploadRealImage(token, wideImage);
+        uploadRealImage(token, portraitImage);
+
+        ImageSearchRequest request = new ImageSearchRequest();
+        request.setOnlyOwn(true);
+        request.setMinWidth(wideImage.getWidth() - 20);
+        request.setMaxWidth(wideImage.getWidth() + 20);
+        request.setPage(0);
+        request.setSize(10);
+
+        mockMvc.perform(post("/api/images/search")
+                        .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                        .content(json(request))
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content.length()").value(1))
+                .andExpect(jsonPath("$.data.content[0].id").value(wideImageId));
+    }
+
     private User persistUser(String username, String email) {
         User user = new User();
         user.setUsername(username);
@@ -204,5 +253,33 @@ class ImageSearchControllerTest {
     @NonNull
     private String json(Object value) throws Exception {
         return Objects.requireNonNull(objectMapper.writeValueAsString(value));
+    }
+
+    private long uploadRealImage(String token, TestImageResource testImage) throws Exception {
+        MockMultipartFile file = testImage.asMultipart("files");
+        MvcResult result = mockMvc.perform(multipart("/api/images/upload")
+                        .file(Objects.requireNonNull(file))
+                        .param("privacyLevel", "PRIVATE")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(Objects.requireNonNull(MediaType.MULTIPART_FORM_DATA)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode response = objectMapper.readTree(result.getResponse().getContentAsString());
+        return response.path("data").get(0).path("id").asLong();
+    }
+
+    private void deleteDirectory(Path directory) throws IOException {
+        if (directory != null && Files.exists(directory)) {
+            try (var paths = Files.walk(directory)) {
+                paths.sorted((p1, p2) -> p2.compareTo(p1))
+                        .forEach(path -> {
+                            try {
+                                Files.deleteIfExists(path);
+                            } catch (IOException ignored) {
+                            }
+                        });
+            }
+        }
     }
 }
