@@ -29,3 +29,31 @@ jobs:
         run: |
           chmod +x mvnw || true
           ./mvnw -B -DskipTests=false test
+
+  ai-service:
+    name: AI Service Pytest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    needs: backend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install ai-service dependencies
+        working-directory: ai-service
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pytest
+
+      - name: Run ai-service tests
+        working-directory: ai-service
+        run: |
+          python -m pytest -v
