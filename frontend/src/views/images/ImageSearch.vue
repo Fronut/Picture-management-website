@@ -198,6 +198,13 @@
                       <el-space>
                         <el-button
                           text
+                          size="small"
+                          @click="openEditDialog(image)"
+                        >
+                          编辑
+                        </el-button>
+                        <el-button
+                          text
                           type="danger"
                           size="small"
                           :loading="deletingId === image.id"
@@ -245,6 +252,12 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <ImageEditDialog
+      v-model="editDialogVisible"
+      :image="editingImage"
+      @edited="handleEditApplied"
+    />
   </section>
 </template>
 
@@ -263,6 +276,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 
 import { useImageSearchStore } from "@/stores/imageSearch";
 import { useImageUploadStore } from "@/stores/imageUpload";
+import ImageEditDialog from "@/components/ImageEditDialog.vue";
 import type { ImageSearchResult, ImageSearchPayload } from "@/types/image";
 import {
   downloadOriginalImage,
@@ -288,6 +302,8 @@ const filters = computed(() => store.filters);
 const loading = computed(() => store.loading);
 const hasResults = computed(() => store.hasResults);
 const deletingId = ref<number | null>(null);
+const editDialogVisible = ref(false);
+const editingImage = ref<ImageSearchResult | null>(null);
 
 const thumbnailSrcMap = reactive<Record<number, string>>({});
 const originalSrcMap = reactive<Record<number, string>>({});
@@ -468,6 +484,17 @@ const goToTagManager = (imageId: number) => {
   router.push({ name: "image-tags", params: { imageId } });
 };
 
+const openEditDialog = (image: ImageSearchResult) => {
+  editingImage.value = image;
+  editDialogVisible.value = true;
+};
+
+const handleEditApplied = (updated: ImageSearchResult) => {
+  store.replaceImageResult(updated);
+  editDialogVisible.value = false;
+  editingImage.value = null;
+};
+
 const handleDeleteImage = async (image: ImageSearchResult) => {
   try {
     await ElMessageBox.confirm(
@@ -539,6 +566,12 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearMediaCaches();
+});
+
+watch(editDialogVisible, (visible) => {
+  if (!visible) {
+    editingImage.value = null;
+  }
 });
 </script>
 
