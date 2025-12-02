@@ -2,6 +2,8 @@ import apiClient from "./apiClient";
 import type { ApiResponse, PageResponse } from "@/types/api";
 import type {
   ImageDeleteResult,
+  ImageEditPayload,
+  ImageEditResult,
   ImageSearchPayload,
   ImageSearchResult,
   ImageUploadPayload,
@@ -96,6 +98,41 @@ export const deleteImage = async (
   return data.data;
 };
 
+export const editImage = async (
+  payload: ImageEditPayload
+): Promise<ImageEditResult> => {
+  const requestBody: Record<string, unknown> = {};
+
+  if (payload.crop) {
+    requestBody.crop = {
+      x: payload.crop.x,
+      y: payload.crop.y,
+      width: payload.crop.width,
+      height: payload.crop.height,
+    };
+  }
+
+  const tone = normalizeTonePayload(payload.toneAdjustment);
+  if (tone) {
+    requestBody.toneAdjustment = tone;
+  }
+
+  if (!requestBody.crop && !requestBody.toneAdjustment) {
+    throw new Error("请至少选择一个编辑操作");
+  }
+
+  const { data } = await apiClient.post<ApiResponse<ImageEditResult>>(
+    `${IMAGE_BASE}/${payload.imageId}/edit`,
+    requestBody
+  );
+
+  if (!data.data) {
+    throw new Error(data.message || "编辑失败");
+  }
+
+  return data.data;
+};
+
 const normalizeSearchPayload = (payload: ImageSearchPayload) => ({
   keyword: payload.keyword?.trim() || undefined,
   // privacy: treat explicit 'ALL' as undefined to avoid sending an invalid enum
@@ -162,3 +199,22 @@ const normalizeSearchPayload = (payload: ImageSearchPayload) => ({
   sortBy: payload.sortBy ?? "uploadTime",
   sortDirection: payload.sortDirection ?? "DESC",
 });
+
+const normalizeTonePayload = (tone?: ImageEditPayload["toneAdjustment"]) => {
+  if (!tone) {
+    return undefined;
+  }
+  const normalized: Record<string, number> = {};
+  const maybeAssign = (key: keyof typeof tone) => {
+    const value = tone[key];
+    if (typeof value === "number" && value !== 0) {
+      normalized[key] = Number(value.toFixed(2));
+    }
+  };
+
+  maybeAssign("brightness");
+  maybeAssign("contrast");
+  maybeAssign("warmth");
+
+  return Object.keys(normalized).length ? normalized : undefined;
+};

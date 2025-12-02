@@ -132,5 +132,15 @@ export const useImageSearchStore = defineStore("imageSearch", {
       const currentPage = this.filters.page ?? this.pagination.pageNumber ?? 0;
       await this.fetch(currentPage);
     },
+
+    replaceImageResult(updated: ImageSearchResult) {
+      const index = this.results.findIndex((image) => image.id === updated.id);
+      if (index === -1) {
+        return;
+      }
+      const next = [...this.results];
+      next.splice(index, 1, updated);
+      this.results = next;
+    },
   },
 });

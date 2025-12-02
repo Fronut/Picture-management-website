@@ -53,6 +53,27 @@ export interface ImageSummaryThumbnail {
   fileSize: number;
 }
 
+export interface ImageEditCrop {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface ImageEditToneAdjustment {
+  brightness?: number;
+  contrast?: number;
+  warmth?: number;
+}
+
+export interface ImageEditPayload {
+  imageId: number;
+  crop?: ImageEditCrop;
+  toneAdjustment?: ImageEditToneAdjustment;
+}
+
+export type ImageEditResult = ImageSearchResult;
+
 export interface ImageSearchResult {
   id: number;
   originalFilename: string;
