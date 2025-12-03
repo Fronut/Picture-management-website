@@ -12,7 +12,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.imagemanagement.ai.AiServiceClient;
+import com.imagemanagement.ai.dto.AiTagSuggestion;
+import com.imagemanagement.ai.dto.AiTagSuggestionResponse;
 import com.imagemanagement.dto.request.AiTagAssignmentRequest;
+import com.imagemanagement.dto.request.AiTagGenerationRequest;
 import com.imagemanagement.dto.request.TagAssignmentRequest;
 import com.imagemanagement.entity.Image;
 import com.imagemanagement.entity.ImageTag;
@@ -27,6 +31,9 @@ import com.imagemanagement.repository.TagRepository;
 import com.imagemanagement.repository.UserRepository;
 import com.imagemanagement.security.CustomUserDetails;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,12 +42,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.BDDMockito.given;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -69,6 +81,9 @@ class TagControllerIntegrationTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @MockBean
+    private AiServiceClient aiServiceClient;
 
     private User owner;
 
@@ -169,6 +184,27 @@ class TagControllerIntegrationTest {
         assertThat(stored.getUsageCount()).isEqualTo(1);
     }
 
+        @Test
+        void generateAiTags_shouldInvokeAiServiceAndPersistResponse() throws Exception {
+        AiTagSuggestionResponse aiResponse = new AiTagSuggestionResponse(
+            List.of(new AiTagSuggestion("ocean", 0.91, "test")),
+            java.util.Map.of("width", 100));
+        given(aiServiceClient.suggestTags(any(), anyString(), anyList(), any())).willReturn(aiResponse);
+
+        AiTagGenerationRequest request = new AiTagGenerationRequest(List.of("vacation"), 3);
+
+        mockMvc.perform(post("/api/images/{imageId}/tags/ai/generate", image.getId())
+                .with(authentication(buildAuthentication(owner)))
+                .contentType(APPLICATION_JSON)
+                .content(objectMapper.writeValueAsBytes(request)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data", hasSize(1)))
+            .andExpect(jsonPath("$.data[0].tagName").value("ocean"))
+            .andExpect(jsonPath("$.data[0].tagType").value("AI"));
+
+        assertThat(imageTagRepository.findAllByImageId(image.getId())).hasSize(1);
+        }
+
     @Test
     void addCustomTags_shouldRejectWhenUserDoesNotOwnImage() throws Exception {
         User otherUser = persistUser("intruder", "intruder@example.com");
@@ -204,7 +240,14 @@ class TagControllerIntegrationTest {
         newImage.setUser(owner);
         newImage.setOriginalFilename(originalFilename);
         newImage.setStoredFilename(originalFilename + "-stored");
-        newImage.setFilePath("/tmp/" + originalFilename);
+        try {
+            Path tempFile = Files.createTempFile("img-", originalFilename);
+            Files.writeString(tempFile, "dummy-image", StandardCharsets.UTF_8);
+            tempFile.toFile().deleteOnExit();
+            newImage.setFilePath(tempFile.toAbsolutePath().toString());
+        } catch (Exception ex) {
+            throw new IllegalStateException("Failed to prepare test image", ex);
+        }
         newImage.setFileSize(1_024L);
         newImage.setMimeType("image/jpeg");
         newImage.setUploadTime(LocalDateTime.now());
