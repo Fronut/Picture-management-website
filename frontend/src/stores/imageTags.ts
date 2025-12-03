@@ -6,10 +6,16 @@ import {
   addCustomTags,
   fetchImageTags,
   fetchPopularTags,
+  generateAiTags,
   removeImageTag,
 } from "@/services/tagService";
 import { useImageUploadStore } from "@/stores/imageUpload";
-import type { AiTagSuggestionInput, ImageTag, TagSummary } from "@/types/tag";
+import type {
+  AiTagGenerationOptions,
+  AiTagSuggestionInput,
+  ImageTag,
+  TagSummary,
+} from "@/types/tag";
 
 interface ImageTagState {
   currentImageId: number | null;
@@ -18,6 +24,7 @@ interface ImageTagState {
   isMutating: boolean;
   popularTags: TagSummary[];
   popularLoading: boolean;
+  aiGenerating: boolean;
 }
 
 const defaultState = (): ImageTagState => ({
@@ -27,6 +34,7 @@ const defaultState = (): ImageTagState => ({
   isMutating: false,
   popularTags: [],
   popularLoading: false,
+  aiGenerating: false,
 });
 
 export const useImageTagStore = defineStore("imageTags", {
@@ -149,6 +157,24 @@ export const useImageTagStore = defineStore("imageTags", {
         );
       } finally {
         this.isMutating = false;
+      }
+    },
+
+    async generateAi(options: AiTagGenerationOptions = {}) {
+      if (!this.currentImageId) {
+        ElMessage.warning("请先选择图片");
+        return;
+      }
+      this.aiGenerating = true;
+      try {
+        this.tags = await generateAiTags(this.currentImageId, options);
+        ElMessage.success("AI 已生成标签");
+      } catch (error) {
+        ElMessage.error(
+          error instanceof Error ? error.message : "生成 AI 标签失败"
+        );
+      } finally {
+        this.aiGenerating = false;
       }
     },
   },

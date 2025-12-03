@@ -19,3 +19,8 @@ export interface AiTagSuggestionInput {
   name: string;
   confidence?: number;
 }
+
+export interface AiTagGenerationOptions {
+  hints?: string[];
+  limit?: number;
+}

@@ -1,6 +1,11 @@
 import apiClient from "./apiClient";
 import type { ApiResponse } from "@/types/api";
-import type { AiTagSuggestionInput, ImageTag, TagSummary } from "@/types/tag";
+import type {
+  AiTagGenerationOptions,
+  AiTagSuggestionInput,
+  ImageTag,
+  TagSummary,
+} from "@/types/tag";
 
 const IMAGE_BASE = "/images";
 const TAG_BASE = "/tags";
@@ -41,6 +46,26 @@ export const addAiTags = async (
   const { data } = await apiClient.post<ApiResponse<ImageTag[]>>(
     `${IMAGE_BASE}/${imageId}/tags/ai`,
     payload
+  );
+
+  return data.data ?? [];
+};
+
+export const generateAiTags = async (
+  imageId: number,
+  options: AiTagGenerationOptions = {}
+): Promise<ImageTag[]> => {
+  const body: Record<string, unknown> = {};
+  if (options.hints && options.hints.length) {
+    body.hints = options.hints;
+  }
+  if (options.limit) {
+    body.limit = options.limit;
+  }
+
+  const { data } = await apiClient.post<ApiResponse<ImageTag[]>>(
+    `${IMAGE_BASE}/${imageId}/tags/ai/generate`,
+    Object.keys(body).length ? body : undefined
   );
 
   return data.data ?? [];
