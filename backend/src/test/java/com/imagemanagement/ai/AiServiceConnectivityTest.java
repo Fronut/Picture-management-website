@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
@@ -26,11 +28,12 @@ import org.testcontainers.utility.MountableFile;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class AiServiceConnectivityTest {
 
     private static final Path AI_SERVICE_DIR = Path.of("..", "ai-service").toAbsolutePath().normalize();
     private static final Path SAMPLE_IMAGE = Path.of("..", "test", "Pictures", "beach.jpeg").toAbsolutePath().normalize();
+    private static final boolean DOCKER_AVAILABLE = DockerClientFactory.instance().isDockerAvailable();
 
         @Container
         @SuppressWarnings("resource")
@@ -49,6 +52,7 @@ class AiServiceConnectivityTest {
 
     @DynamicPropertySource
     static void configureAiServiceUrl(DynamicPropertyRegistry registry) {
+        Assumptions.assumeTrue(DOCKER_AVAILABLE, "Docker is required for AI service connectivity tests");
         Startables.deepStart(java.util.stream.Stream.of(aiService)).join();
         registry.add("app.ai.service-url", () -> String.format("http://%s:%d", aiService.getHost(), aiService.getMappedPort(5000)));
     }

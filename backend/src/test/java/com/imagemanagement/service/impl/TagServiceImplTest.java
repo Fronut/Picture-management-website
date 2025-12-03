@@ -1,5 +1,6 @@
 package com.imagemanagement.service.impl;
 
+import com.imagemanagement.ai.AiServiceClient;
 import com.imagemanagement.dto.request.AiTagAssignmentRequest;
 import com.imagemanagement.dto.request.TagAssignmentRequest;
 import com.imagemanagement.dto.response.ImageTagResponse;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
 
@@ -46,6 +48,9 @@ class TagServiceImplTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @MockBean
+    private AiServiceClient aiServiceClient;
 
     private User user;
     private Image image;
