@@ -12,6 +12,8 @@ export interface AuthResponse {
   token: string;
   tokenType: string;
   expiresIn: number;
+  refreshToken: string;
+  refreshExpiresIn: number;
   user: User;
 }
 
@@ -24,4 +26,12 @@ export interface RegisterPayload {
   username: string;
   email: string;
   password: string;
+}
+
+export interface RefreshPayload {
+  refreshToken: string;
+}
+
+export interface LogoutPayload extends RefreshPayload {
+  logoutAllSessions?: boolean;
 }

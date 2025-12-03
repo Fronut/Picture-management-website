@@ -53,13 +53,13 @@ const router = createRouter({
   ],
 });
 
-const guard = (
+const guard = async (
   to: RouteLocationNormalized,
   _from: RouteLocationNormalized,
   next: NavigationGuardNext
 ) => {
   const authStore = useAuthStore();
-  authStore.initialize();
+  await authStore.ensureSession();
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next({

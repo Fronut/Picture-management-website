@@ -1,5 +1,11 @@
 import apiClient from "./apiClient";
-import type { AuthResponse, LoginPayload, RegisterPayload } from "@/types/auth";
+import type {
+  AuthResponse,
+  LoginPayload,
+  LogoutPayload,
+  RefreshPayload,
+  RegisterPayload,
+} from "@/types/auth";
 import type { ApiResponse } from "@/types/api";
 
 const AUTH_BASE = "/auth";
@@ -29,4 +35,18 @@ export const registerRequest = async (
     payload
   );
   return extractData(data);
+};
+
+export const refreshSessionRequest = async (
+  payload: RefreshPayload
+): Promise<AuthResponse> => {
+  const { data } = await apiClient.post<ApiResponse<AuthResponse>>(
+    `${AUTH_BASE}/refresh`,
+    payload
+  );
+  return extractData(data);
+};
+
+export const logoutRequest = async (payload: LogoutPayload): Promise<void> => {
+  await apiClient.post<ApiResponse<void>>(`${AUTH_BASE}/logout`, payload);
 };
