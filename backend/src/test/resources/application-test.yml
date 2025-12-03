@@ -39,3 +39,6 @@ app:
       - type: MEDIUM
         width: 256
         height: 256
+  ai:
+    service-url: http://localhost:5000
+    timeout: 30s
