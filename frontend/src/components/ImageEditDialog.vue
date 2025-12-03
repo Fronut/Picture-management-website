@@ -6,7 +6,12 @@
     append-to-body
     title="图片编辑"
   >
-    <div v-if="!image" class="empty-state">请选择一张图片进行编辑。</div>
+    <div
+      v-if="!image"
+      class="empty-state"
+    >
+      请选择一张图片进行编辑。
+    </div>
     <div v-else>
       <el-alert
         type="info"
@@ -15,19 +20,26 @@
         title="裁剪与色调调整会覆盖原图并重新生成缩略图，操作不可撤销，请谨慎使用"
       />
 
-      <el-form label-position="top" class="edit-form">
+      <el-form
+        label-position="top"
+        class="edit-form"
+      >
         <section class="form-section">
           <div class="section-header">
             <div>
               <h4>裁剪</h4>
-              <small v-if="canCrop"
-                >当前尺寸：{{ image.width }} × {{ image.height }}</small
-              >
+              <small v-if="canCrop">当前尺寸：{{ image.width }} × {{ image.height }}</small>
               <small v-else>当前图片缺少分辨率信息，无法裁剪</small>
             </div>
-            <el-switch v-model="form.cropEnabled" :disabled="!canCrop" />
+            <el-switch
+              v-model="form.cropEnabled"
+              :disabled="!canCrop"
+            />
           </div>
-          <div v-if="form.cropEnabled && canCrop" class="crop-grid">
+          <div
+            v-if="form.cropEnabled && canCrop"
+            class="crop-grid"
+          >
             <el-form-item label="起始 X">
               <el-input-number
                 v-model="form.crop.x"
@@ -73,7 +85,10 @@
             </div>
             <el-switch v-model="form.toneEnabled" />
           </div>
-          <div class="tone-controls" :class="{ disabled: !form.toneEnabled }">
+          <div
+            class="tone-controls"
+            :class="{ disabled: !form.toneEnabled }"
+          >
             <el-form-item label="亮度">
               <el-slider
                 v-model="form.tone.brightness"
@@ -111,8 +126,16 @@
 
     <template #footer>
       <el-space>
-        <el-button @click="handleReset" :disabled="submitting">重置</el-button>
-        <el-button @click="handleDialogClose" :disabled="submitting">
+        <el-button
+          :disabled="submitting"
+          @click="handleReset"
+        >
+          重置
+        </el-button>
+        <el-button
+          :disabled="submitting"
+          @click="handleDialogClose"
+        >
           取消
         </el-button>
         <el-button

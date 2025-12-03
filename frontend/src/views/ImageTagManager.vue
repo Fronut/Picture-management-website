@@ -50,7 +50,7 @@
 
           <el-empty v-if="!tags.length && !isLoading" description="暂无标签" />
 
-          <el-table v-else :data="tags" size="small" v-loading="isLoading">
+          <el-table v-else v-loading="isLoading" :data="tags" size="small">
             <el-table-column label="标签名" prop="tagName" min-width="150" />
             <el-table-column label="类型" width="120">
               <template #default="{ row }">
@@ -87,7 +87,7 @@
       </el-col>
 
       <el-col :md="8" :xs="24">
-        <el-card shadow="never" class="popular-card" v-loading="popularLoading">
+        <el-card v-loading="popularLoading" shadow="never" class="popular-card">
           <template #header>
             <div class="card-header">
               <h3>热门标签</h3>
@@ -195,6 +195,39 @@
           >
             同步到后端
           </el-button>
+          <el-divider>或</el-divider>
+          <el-form
+            class="ai-generate-form"
+            label-position="top"
+            @submit.prevent
+          >
+            <el-form-item label="AI 提示词（可选）">
+              <el-select
+                v-model="aiHints"
+                multiple
+                filterable
+                allow-create
+                default-first-option
+                placeholder="输入主题、地点或风格，用于提示 AI"
+              />
+            </el-form-item>
+            <el-form-item label="生成标签数量">
+              <el-input-number
+                v-model="aiGenerateLimit"
+                :min="1"
+                :max="20"
+                :step="1"
+              />
+            </el-form-item>
+            <el-button
+              type="success"
+              plain
+              :loading="aiGenerating"
+              @click="handleGenerateAi"
+            >
+              让 AI 直接生成
+            </el-button>
+          </el-form>
         </el-card>
       </el-col>
     </el-row>
@@ -213,8 +246,14 @@ const router = useRouter();
 const route = useRoute();
 const tagStore = useImageTagStore();
 
-const { tags, isLoading, isMutating, popularTags, popularLoading } =
-  storeToRefs(tagStore);
+const {
+  tags,
+  isLoading,
+  isMutating,
+  popularTags,
+  popularLoading,
+  aiGenerating,
+} = storeToRefs(tagStore);
 
 const imageId = computed(() => {
   const raw = Number(route.params.imageId);
@@ -242,6 +281,8 @@ const customTagInput = ref<string[]>([]);
 const aiSuggestions = ref(
   Array.from({ length: 2 }, () => ({ name: "", confidence: 0.9 }))
 );
+const aiHints = ref<string[]>([]);
+const aiGenerateLimit = ref<number>(6);
 
 const handleLoadImage = () => {
   if (!editableImageId.value) {
@@ -301,6 +342,18 @@ const submitAiTags = () => {
     return;
   }
   tagStore.addAi(payload);
+};
+
+const handleGenerateAi = () => {
+  const hints = aiHints.value.map((hint) => hint.trim()).filter(Boolean);
+  const payload: { hints?: string[]; limit?: number } = {};
+  if (hints.length) {
+    payload.hints = hints;
+  }
+  if (aiGenerateLimit.value && aiGenerateLimit.value > 0) {
+    payload.limit = aiGenerateLimit.value;
+  }
+  tagStore.generateAi(payload);
 };
 
 const handleRemove = (tagId: number) => {
@@ -377,6 +430,13 @@ const formatTagType = (type: string) => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.ai-generate-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
 }
 
 .ai-row {
