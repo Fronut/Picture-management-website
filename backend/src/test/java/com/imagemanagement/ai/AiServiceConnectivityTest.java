@@ -33,6 +33,7 @@ class AiServiceConnectivityTest {
     private static final Path SAMPLE_IMAGE = Path.of("..", "test", "Pictures", "beach.jpeg").toAbsolutePath().normalize();
 
         @Container
+        @SuppressWarnings("resource")
         static final GenericContainer<?> aiService = new GenericContainer<>(DockerImageName.parse("python:3.11-slim"))
             .withExposedPorts(5000)
             .withEnv("PYTHONUNBUFFERED", "1")
