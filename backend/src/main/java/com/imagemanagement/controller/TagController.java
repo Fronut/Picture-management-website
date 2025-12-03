@@ -1,6 +1,7 @@
 package com.imagemanagement.controller;
 
 import com.imagemanagement.dto.request.AiTagAssignmentRequest;
+import com.imagemanagement.dto.request.AiTagGenerationRequest;
 import com.imagemanagement.dto.request.TagAssignmentRequest;
 import com.imagemanagement.dto.response.ApiResponse;
 import com.imagemanagement.dto.response.ImageTagResponse;
@@ -53,6 +54,17 @@ public class TagController {
             Authentication authentication) {
         CustomUserDetails principal = requirePrincipal(authentication);
         List<ImageTagResponse> responses = tagService.assignAiTags(principal.getId(), imageId, request);
+        return ResponseEntity.ok(ApiResponse.success(responses));
+    }
+
+    @PostMapping("/images/{imageId}/tags/ai/generate")
+    public ResponseEntity<ApiResponse<List<ImageTagResponse>>> generateAiTags(
+            @PathVariable Long imageId,
+            @Valid @RequestBody(required = false) AiTagGenerationRequest request,
+            Authentication authentication) {
+        CustomUserDetails principal = requirePrincipal(authentication);
+        AiTagGenerationRequest effectiveRequest = request != null ? request : new AiTagGenerationRequest(null, null);
+        List<ImageTagResponse> responses = tagService.generateAiTags(principal.getId(), imageId, effectiveRequest);
         return ResponseEntity.ok(ApiResponse.success(responses));
     }
 

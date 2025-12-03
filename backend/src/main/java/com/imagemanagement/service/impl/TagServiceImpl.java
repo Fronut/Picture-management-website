@@ -1,6 +1,9 @@
 package com.imagemanagement.service.impl;
 
+import com.imagemanagement.ai.AiServiceClient;
+import com.imagemanagement.ai.dto.AiTagSuggestionResponse;
 import com.imagemanagement.dto.request.AiTagAssignmentRequest;
+import com.imagemanagement.dto.request.AiTagGenerationRequest;
 import com.imagemanagement.dto.request.TagAssignmentRequest;
 import com.imagemanagement.dto.response.ImageTagResponse;
 import com.imagemanagement.dto.response.TagResponse;
@@ -11,16 +14,22 @@ import com.imagemanagement.entity.Tag;
 import com.imagemanagement.entity.User;
 import com.imagemanagement.entity.enums.TagType;
 import com.imagemanagement.exception.BadRequestException;
+import com.imagemanagement.exception.ResourceNotFoundException;
 import com.imagemanagement.repository.ImageRepository;
 import com.imagemanagement.repository.ImageTagRepository;
 import com.imagemanagement.repository.TagRepository;
 import com.imagemanagement.service.TagService;
 import jakarta.transaction.Transactional;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -41,13 +50,16 @@ public class TagServiceImpl implements TagService {
     private final TagRepository tagRepository;
     private final ImageRepository imageRepository;
     private final ImageTagRepository imageTagRepository;
+    private final AiServiceClient aiServiceClient;
 
     public TagServiceImpl(TagRepository tagRepository,
             ImageRepository imageRepository,
-            ImageTagRepository imageTagRepository) {
+            ImageTagRepository imageTagRepository,
+            AiServiceClient aiServiceClient) {
         this.tagRepository = tagRepository;
         this.imageRepository = imageRepository;
         this.imageTagRepository = imageTagRepository;
+        this.aiServiceClient = aiServiceClient;
     }
 
     @Override
@@ -84,6 +96,40 @@ public class TagServiceImpl implements TagService {
                 .toList();
         attachCandidates(image, candidates);
         return getTagsForImage(imageId);
+    }
+
+    @Override
+    public List<ImageTagResponse> generateAiTags(Long userId, Long imageId, AiTagGenerationRequest request) {
+        Objects.requireNonNull(userId, "userId cannot be null");
+        Objects.requireNonNull(imageId, "imageId cannot be null");
+        Image image = loadOwnedImage(userId, imageId);
+        byte[] payload = resolveImageBytes(image);
+
+        List<String> hints = request != null ? sanitizeHints(request.hints()) : Collections.emptyList();
+        Integer limit = request != null ? request.limit() : null;
+
+        AiTagSuggestionResponse response = aiServiceClient.suggestTags(
+                payload,
+                image.getOriginalFilename(),
+                hints.isEmpty() ? null : hints,
+                limit);
+
+        if (response == null || CollectionUtils.isEmpty(response.tags())) {
+            throw new BadRequestException("AI service returned no tag suggestions");
+        }
+
+        List<AiTagAssignmentRequest.TagSuggestion> suggestions = response.tags().stream()
+                .filter(suggestion -> StringUtils.hasText(suggestion.name()))
+                .map(suggestion -> new AiTagAssignmentRequest.TagSuggestion(
+                        suggestion.name(),
+                        BigDecimal.valueOf(suggestion.confidence())))
+                .toList();
+
+        if (suggestions.isEmpty()) {
+            throw new BadRequestException("AI service returned no valid tag names");
+        }
+
+        return assignAiTags(userId, imageId, new AiTagAssignmentRequest(suggestions));
     }
 
     @Override
@@ -149,6 +195,33 @@ public class TagServiceImpl implements TagService {
         }
 
         return candidates;
+    }
+
+    private byte[] resolveImageBytes(Image image) {
+        if (image == null || !StringUtils.hasText(image.getFilePath())) {
+            throw new ResourceNotFoundException("Image binary data is not available");
+        }
+        Path path = Paths.get(image.getFilePath());
+        try {
+            if (!Files.exists(path)) {
+                throw new ResourceNotFoundException("Image binary data is not available");
+            }
+            return Files.readAllBytes(path);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to read stored image from disk", ex);
+        }
+    }
+
+    private List<String> sanitizeHints(List<String> hints) {
+        if (CollectionUtils.isEmpty(hints)) {
+            return Collections.emptyList();
+        }
+        return hints.stream()
+            .filter(Objects::nonNull)
+            .map(String::trim)
+            .filter(StringUtils::hasText)
+            .distinct()
+            .toList();
     }
 
     private String detectSeason(int month) {

@@ -1,6 +1,7 @@
 package com.imagemanagement.service;
 
 import com.imagemanagement.dto.request.AiTagAssignmentRequest;
+import com.imagemanagement.dto.request.AiTagGenerationRequest;
 import com.imagemanagement.dto.request.TagAssignmentRequest;
 import com.imagemanagement.dto.response.ImageTagResponse;
 import com.imagemanagement.dto.response.TagResponse;
@@ -14,6 +15,8 @@ public interface TagService {
     List<ImageTagResponse> assignCustomTags(Long userId, Long imageId, TagAssignmentRequest request);
 
     List<ImageTagResponse> assignAiTags(Long userId, Long imageId, AiTagAssignmentRequest request);
+
+    List<ImageTagResponse> generateAiTags(Long userId, Long imageId, AiTagGenerationRequest request);
 
     void removeTag(Long userId, Long imageId, Long tagId);
 
