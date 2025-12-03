@@ -21,6 +21,35 @@
               />
             </el-form-item>
 
+            <el-form-item label="AI 自然语言检索">
+              <div class="ai-search-row">
+                <el-input
+                  v-model="aiQuery"
+                  placeholder="例如：黄昏海滩 4K 人像"
+                  clearable
+                  @keyup.enter="handleAiInterpret"
+                >
+                  <template #append>
+                    <el-button
+                      type="primary"
+                      :loading="aiInterpreting"
+                      @click="handleAiInterpret"
+                    >
+                      生成条件
+                    </el-button>
+                  </template>
+                </el-input>
+              </div>
+              <el-alert
+                v-if="aiSummary"
+                :title="aiSummary"
+                type="success"
+                :closable="false"
+                show-icon
+                class="ai-summary"
+              />
+            </el-form-item>
+
             <el-form-item label="标签">
               <el-select
                 v-model="localFilters.tags"
@@ -93,10 +122,10 @@
 
             <el-form-item label="隐私">
               <el-radio-group v-model="localFilters.privacyLevel">
-                <el-radio-button label="PUBLIC">公开</el-radio-button>
-                <el-radio-button label="PRIVATE">私有</el-radio-button>
+                <el-radio-button label="PUBLIC"> 公开 </el-radio-button>
+                <el-radio-button label="PRIVATE"> 私有 </el-radio-button>
                 <!-- use explicit ALL token and convert to undefined in request normalization -->
-                <el-radio-button label="ALL">全部</el-radio-button>
+                <el-radio-button label="ALL"> 全部 </el-radio-button>
               </el-radio-group>
             </el-form-item>
 
@@ -130,8 +159,8 @@
               </div>
               <el-select
                 v-model="sortValue"
-                @change="handleSortChange"
                 size="small"
+                @change="handleSortChange"
               >
                 <el-option label="最新上传" value="uploadTime|DESC" />
                 <el-option label="最早上传" value="uploadTime|ASC" />
@@ -237,16 +266,16 @@
             </el-row>
           </div>
 
-          <div class="pagination" v-if="hasResults">
+          <div v-if="hasResults" class="pagination">
             <el-pagination
               background
               layout="prev, pager, next, sizes, jumper"
               :total="pagination.totalElements"
               :page-size="pagination.pageSize"
               :current-page="pagination.pageNumber + 1"
+              :page-sizes="[10, 20, 40, 60]"
               @current-change="handlePageChange"
               @size-change="handleSizeChange"
-              :page-sizes="[10, 20, 40, 60]"
             />
           </div>
         </el-card>
@@ -277,12 +306,18 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { useImageSearchStore } from "@/stores/imageSearch";
 import { useImageUploadStore } from "@/stores/imageUpload";
 import ImageEditDialog from "@/components/ImageEditDialog.vue";
-import type { ImageSearchResult, ImageSearchPayload } from "@/types/image";
+import { interpretSearchQuery } from "@/services/aiService";
+import type {
+  ImageSearchResult,
+  ImageSearchPayload,
+  ImageSearchPrivacy,
+} from "@/types/image";
 import {
   downloadOriginalImage,
   downloadThumbnail,
   deleteImage,
 } from "@/services/imageService";
+import type { AiSearchInterpretation } from "@/types/ai";
 
 const router = useRouter();
 const store = useImageSearchStore();
@@ -295,6 +330,9 @@ const dateRange = ref<[string, string] | null>(
     ? [store.filters.uploadedFrom, store.filters.uploadedTo]
     : null
 );
+const aiQuery = ref("");
+const aiInterpreting = ref(false);
+const aiResult = ref<AiSearchInterpretation | null>(null);
 
 const results = computed(() => store.results);
 const pagination = computed(() => store.pagination);
@@ -304,6 +342,25 @@ const hasResults = computed(() => store.hasResults);
 const deletingId = ref<number | null>(null);
 const editDialogVisible = ref(false);
 const editingImage = ref<ImageSearchResult | null>(null);
+const aiSummary = computed(() => {
+  if (!aiResult.value) {
+    return "";
+  }
+  const parts: string[] = [];
+  if (aiResult.value.tags && aiResult.value.tags.length) {
+    parts.push(`标签: ${aiResult.value.tags.join(", ")}`);
+  }
+  if (aiResult.value.keywords && aiResult.value.keywords.length) {
+    parts.push(`关键词: ${aiResult.value.keywords.join(", ")}`);
+  }
+  if (
+    aiResult.value.confidence !== undefined &&
+    aiResult.value.confidence !== null
+  ) {
+    parts.push(`置信度 ${(aiResult.value.confidence * 100).toFixed(0)}%`);
+  }
+  return parts.join(" | ");
+});
 
 const thumbnailSrcMap = reactive<Record<number, string>>({});
 const originalSrcMap = reactive<Record<number, string>>({});
@@ -342,6 +399,134 @@ const handleSearch = () => {
     payload.uploadedTo = undefined;
   }
   store.searchWithFilters(payload);
+};
+
+const toCamelCase = (key: string) =>
+  key.replace(/[-_]([a-zA-Z])/g, (_, group: string) => group.toUpperCase());
+
+const isValidPrivacyLevel = (value: unknown): value is ImageSearchPrivacy =>
+  value === "PUBLIC" || value === "PRIVATE" || value === "ALL";
+
+const coerceNumber = (value: unknown): number | undefined => {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+  const num = Number(value);
+  return Number.isNaN(num) ? undefined : num;
+};
+
+const buildFiltersFromInterpretation = (
+  interpretation: AiSearchInterpretation
+): Partial<ImageSearchPayload> => {
+  const payload: Partial<ImageSearchPayload> = {};
+  const rawFilters = interpretation.filters ?? {};
+  const normalizedFilters: Record<string, unknown> = {};
+  Object.entries(rawFilters).forEach(([key, value]) => {
+    normalizedFilters[toCamelCase(key)] = value;
+  });
+
+  const setString = (
+    sourceKey: string,
+    targetKey: keyof ImageSearchPayload
+  ) => {
+    const value = normalizedFilters[sourceKey];
+    if (typeof value === "string" && value.trim()) {
+      payload[targetKey] = value.trim() as never;
+    }
+  };
+
+  setString("keyword", "keyword");
+  setString("cameraMake", "cameraMake");
+  setString("cameraModel", "cameraModel");
+
+  const tagsValue = normalizedFilters["tags"];
+  if (Array.isArray(tagsValue)) {
+    const tagList = tagsValue.map((tag) => String(tag).trim()).filter(Boolean);
+    if (tagList.length) {
+      payload.tags = tagList;
+    }
+  }
+
+  const numericKeys: Array<
+    keyof Pick<
+      ImageSearchPayload,
+      "minWidth" | "maxWidth" | "minHeight" | "maxHeight"
+    >
+  > = ["minWidth", "maxWidth", "minHeight", "maxHeight"];
+  numericKeys.forEach((key) => {
+    const value = coerceNumber(normalizedFilters[key]);
+    if (typeof value === "number" && value >= 0) {
+      payload[key] = value;
+    }
+  });
+
+  const dateKeys: Array<
+    keyof Pick<ImageSearchPayload, "uploadedFrom" | "uploadedTo">
+  > = ["uploadedFrom", "uploadedTo"];
+  dateKeys.forEach((key) => {
+    const value = normalizedFilters[key];
+    if (typeof value === "string" && value.trim()) {
+      payload[key] = value.trim();
+    }
+  });
+
+  const privacyValue = normalizedFilters["privacyLevel"];
+  if (typeof privacyValue === "string") {
+    const normalized = privacyValue.trim().toUpperCase();
+    if (isValidPrivacyLevel(normalized)) {
+      payload.privacyLevel = normalized;
+    }
+  }
+
+  const ownValue = normalizedFilters["onlyOwn"];
+  if (typeof ownValue === "boolean") {
+    payload.onlyOwn = ownValue;
+  } else if (typeof ownValue === "string") {
+    payload.onlyOwn = ownValue.toLowerCase() === "true";
+  }
+
+  if (!payload.tags?.length && interpretation.tags?.length) {
+    payload.tags = interpretation.tags;
+  }
+
+  if (!payload.keyword && interpretation.keywords?.length) {
+    payload.keyword = interpretation.keywords.join(" ");
+  }
+
+  if (!payload.keyword && interpretation.query) {
+    payload.keyword = interpretation.query;
+  }
+
+  return payload;
+};
+
+const handleAiInterpret = async () => {
+  if (!aiQuery.value.trim()) {
+    ElMessage.warning("请先输入自然语言描述");
+    return;
+  }
+  aiInterpreting.value = true;
+  try {
+    const interpretation = await interpretSearchQuery(aiQuery.value, 12);
+    aiResult.value = interpretation;
+    const payload = buildFiltersFromInterpretation(interpretation);
+    if (payload.uploadedFrom && payload.uploadedTo) {
+      dateRange.value = [payload.uploadedFrom, payload.uploadedTo];
+    } else if (
+      payload.uploadedFrom === undefined &&
+      payload.uploadedTo === undefined
+    ) {
+      dateRange.value = null;
+    }
+    await store.searchWithFilters(payload);
+    ElMessage.success("已根据 AI 建议更新搜索条件");
+  } catch (error) {
+    ElMessage.error(
+      error instanceof Error ? error.message : "AI 解析失败，请稍后再试"
+    );
+  } finally {
+    aiInterpreting.value = false;
+  }
 };
 
 const syncLocalFilters = (source: Partial<ImageSearchPayload>) => {
@@ -608,6 +793,14 @@ watch(editDialogVisible, (visible) => {
 .result-info {
   margin: 0;
   color: rgba(0, 0, 0, 0.45);
+}
+
+.ai-search-row {
+  width: 100%;
+}
+
+.ai-summary {
+  margin-top: 8px;
 }
 
 .result-grid {
