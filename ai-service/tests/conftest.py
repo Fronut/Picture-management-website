@@ -19,7 +19,7 @@ class SampleImage:
 
 @pytest.fixture()
 def client():
-    app = create_app({"TESTING": True})
+    app = create_app({"TESTING": True, "enable_vision_model": False})
     with app.test_client() as client:
         yield client
 
