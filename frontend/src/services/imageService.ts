@@ -61,6 +61,23 @@ export const searchImages = async (
   return data.data;
 };
 
+export const fetchHighlightImages = async (
+  size = 6
+): Promise<ImageSearchResult[]> => {
+  const { data } = await apiClient.get<ApiResponse<ImageSearchResult[]>>(
+    `${IMAGE_BASE}/highlights`,
+    {
+      params: { size },
+    }
+  );
+
+  if (!data.data) {
+    throw new Error(data.message || "获取精选图片失败");
+  }
+
+  return data.data;
+};
+
 export const downloadThumbnail = async (
   imageId: number,
   thumbnailId: number
