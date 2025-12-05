@@ -764,6 +764,8 @@ watch(editDialogVisible, (visible) => {
 .image-search {
   max-width: 1200px;
   margin: 0 auto;
+  width: 100%;
+  padding-bottom: 32px;
 }
 
 .card-header {
@@ -771,6 +773,12 @@ watch(editDialogVisible, (visible) => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filter-card,
+.result-card {
+  margin-bottom: 16px;
 }
 
 .filter-form {
@@ -813,7 +821,7 @@ watch(editDialogVisible, (visible) => {
 
 .image-cover {
   width: 100%;
-  height: 180px;
+  height: clamp(180px, 40vw, 260px);
   background-color: #f5f5f5;
   border-radius: 6px;
   overflow: hidden;
@@ -859,5 +867,20 @@ watch(editDialogVisible, (visible) => {
   margin-top: 24px;
   display: flex;
   justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .result-info {
+    width: 100%;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .image-card {
+    margin-bottom: 12px;
+  }
 }
 </style>

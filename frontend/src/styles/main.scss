@@ -13,10 +13,22 @@ body {
   font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background: var(--pm-background);
   color: #1f2d3d;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  min-height: 100vh;
 }
 
 a {
   color: #409eff;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
 }
 
 .full-height-card {

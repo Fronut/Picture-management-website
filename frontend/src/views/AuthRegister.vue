@@ -1,9 +1,6 @@
 <template>
   <section class="auth-page">
-    <el-card
-      class="auth-card"
-      shadow="hover"
-    >
+    <el-card class="auth-card" shadow="hover">
       <template #header>
         <div class="card-header">
           <h2>Create Account</h2>
@@ -11,16 +8,8 @@
         </div>
       </template>
 
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-position="top"
-      >
-        <el-form-item
-          label="Username"
-          prop="username"
-        >
+      <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
+        <el-form-item label="Username" prop="username">
           <el-input
             v-model="form.username"
             placeholder="Choose a username"
@@ -28,10 +17,7 @@
           />
         </el-form-item>
 
-        <el-form-item
-          label="Email"
-          prop="email"
-        >
+        <el-form-item label="Email" prop="email">
           <el-input
             v-model="form.email"
             placeholder="Enter your email"
@@ -39,10 +25,7 @@
           />
         </el-form-item>
 
-        <el-form-item
-          label="Password"
-          prop="password"
-        >
+        <el-form-item label="Password" prop="password">
           <el-input
             v-model="form.password"
             type="password"
@@ -65,9 +48,7 @@
 
       <p class="switch-text">
         Already have an account?
-        <router-link to="/auth/login">
-          Sign in
-        </router-link>
+        <router-link to="/auth/login"> Sign in </router-link>
       </p>
     </el-card>
   </section>
@@ -155,13 +136,19 @@ const handleSubmit = () => {
 
 <style scoped>
 .auth-page {
-  max-width: 420px;
+  max-width: 480px;
+  width: 100%;
   margin: 0 auto;
-  padding-top: 48px;
+  min-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px 16px;
 }
 
 .auth-card {
   border-radius: 16px;
+  width: 100%;
 }
 
 .card-header h2 {
@@ -180,5 +167,11 @@ const handleSubmit = () => {
 .switch-text {
   text-align: center;
   margin: 16px 0 0;
+}
+
+@media (max-width: 540px) {
+  .auth-page {
+    padding: 32px 12px 48px;
+  }
 }
 </style>

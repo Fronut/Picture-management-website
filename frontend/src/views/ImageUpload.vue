@@ -1,23 +1,15 @@
 <template>
   <section class="upload-page">
     <el-row :gutter="24">
-      <el-col
-        :xs="24"
-        :lg="16"
-      >
-        <el-card
-          shadow="never"
-          class="upload-card"
-        >
+      <el-col :xs="24" :lg="16">
+        <el-card shadow="never" class="upload-card">
           <template #header>
             <div class="card-header">
               <div>
                 <h2>图片上传</h2>
                 <p>选择图片、设置隐私与描述，点击上传即可。</p>
               </div>
-              <el-tag type="info">
-                最大 20MB/张 (后端限制)
-              </el-tag>
+              <el-tag type="info"> 最大 20MB/张 (后端限制) </el-tag>
             </div>
           </template>
 
@@ -46,18 +38,11 @@
             </template>
           </el-upload>
 
-          <el-form
-            label-width="80px"
-            class="upload-form"
-          >
+          <el-form label-width="80px" class="upload-form">
             <el-form-item label="隐私">
               <el-radio-group v-model="privacyLevel">
-                <el-radio-button label="PRIVATE">
-                  私有
-                </el-radio-button>
-                <el-radio-button label="PUBLIC">
-                  公开
-                </el-radio-button>
+                <el-radio-button label="PRIVATE"> 私有 </el-radio-button>
+                <el-radio-button label="PUBLIC"> 公开 </el-radio-button>
               </el-radio-group>
             </el-form-item>
             <el-form-item label="描述">
@@ -85,63 +70,46 @@
               </el-space>
             </div>
 
-            <el-empty
-              v-if="!candidates.length"
-              description="暂无文件"
-            />
+            <el-empty v-if="!candidates.length" description="暂无文件" />
 
-            <el-table
-              v-else
-              :data="candidates"
-              size="small"
-            >
-              <el-table-column
-                label="文件名"
-                min-width="200"
-              >
-                <template #default="{ row }">
-                  <div class="file-name">
-                    {{ row.file.name }}
-                  </div>
-                  <small class="file-meta">
-                    {{ formatBytes(row.file.size) }} ·
-                    {{ row.file.type || "未知类型" }}
-                  </small>
-                </template>
-              </el-table-column>
-              <el-table-column
-                label="状态"
-                width="140"
-              >
-                <template #default="{ row }">
-                  <el-tag :type="statusType(row.status)">
-                    {{ statusLabel(row.status) }}
-                  </el-tag>
-                  <div
-                    v-if="row.errorMessage"
-                    class="error-text"
-                  >
-                    {{ row.errorMessage }}
-                  </div>
-                </template>
-              </el-table-column>
-              <el-table-column
-                label="操作"
-                width="120"
-              >
-                <template #default="{ row }">
-                  <el-button
-                    text
-                    type="danger"
-                    size="small"
-                    :disabled="isUploading"
-                    @click="handleRemove(row.id)"
-                  >
-                    移除
-                  </el-button>
-                </template>
-              </el-table-column>
-            </el-table>
+            <div v-else class="candidate-table">
+              <el-table :data="candidates" size="small">
+                <el-table-column label="文件名" min-width="200">
+                  <template #default="{ row }">
+                    <div class="file-name">
+                      {{ row.file.name }}
+                    </div>
+                    <small class="file-meta">
+                      {{ formatBytes(row.file.size) }} ·
+                      {{ row.file.type || "未知类型" }}
+                    </small>
+                  </template>
+                </el-table-column>
+                <el-table-column label="状态" width="140">
+                  <template #default="{ row }">
+                    <el-tag :type="statusType(row.status)">
+                      {{ statusLabel(row.status) }}
+                    </el-tag>
+                    <div v-if="row.errorMessage" class="error-text">
+                      {{ row.errorMessage }}
+                    </div>
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="120">
+                  <template #default="{ row }">
+                    <el-button
+                      text
+                      type="danger"
+                      size="small"
+                      :disabled="isUploading"
+                      @click="handleRemove(row.id)"
+                    >
+                      移除
+                    </el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
           </div>
 
           <div class="actions">
@@ -164,40 +132,22 @@
         </el-card>
       </el-col>
 
-      <el-col
-        :xs="24"
-        :lg="8"
-      >
-        <el-card
-          shadow="never"
-          class="result-card"
-        >
+      <el-col :xs="24" :lg="8">
+        <el-card shadow="never" class="result-card">
           <template #header>
             <div class="card-header">
               <h3>上传结果</h3>
             </div>
           </template>
 
-          <el-empty
-            v-if="!summary"
-            description="上传完成后显示结果"
-          />
+          <el-empty v-if="!summary" description="上传完成后显示结果" />
 
           <template v-else>
-            <el-statistic
-              title="总数"
-              :value="summary.total"
-            />
+            <el-statistic title="总数" :value="summary.total" />
             <el-divider />
-            <el-statistic
-              title="成功"
-              :value="summary.success"
-            />
+            <el-statistic title="成功" :value="summary.success" />
             <el-divider />
-            <el-statistic
-              title="失败"
-              :value="summary.failed"
-            />
+            <el-statistic title="失败" :value="summary.failed" />
 
             <el-timeline class="result-timeline">
               <el-timeline-item
@@ -338,6 +288,8 @@ const formatTimestamp = (value: string) => {
 .upload-page {
   max-width: 1200px;
   margin: 0 auto;
+  padding-bottom: 32px;
+  width: 100%;
 }
 
 .upload-card,
@@ -365,6 +317,15 @@ const formatTimestamp = (value: string) => {
   margin-bottom: 24px;
 }
 
+.candidate-table {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.candidate-table :deep(.el-table) {
+  min-width: 560px;
+}
+
 .section-header {
   display: flex;
   align-items: center;
@@ -389,6 +350,11 @@ const formatTimestamp = (value: string) => {
 .actions {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.actions .el-button {
+  flex: 1 1 220px;
 }
 
 .result-timeline {
@@ -398,5 +364,16 @@ const formatTimestamp = (value: string) => {
 .timeline-item {
   display: flex;
   flex-direction: column;
+}
+
+@media (max-width: 900px) {
+  .upload-card,
+  .result-card {
+    margin-bottom: 16px;
+  }
+
+  .actions .el-button {
+    flex-basis: 100%;
+  }
 }
 </style>

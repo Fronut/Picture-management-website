@@ -398,6 +398,8 @@ const formatTagType = (type: string) => {
 .tag-manager {
   max-width: 1200px;
   margin: 0 auto;
+  width: 100%;
+  padding-bottom: 32px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -412,6 +414,18 @@ const formatTagType = (type: string) => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.card-header h3 {
+  margin: 0;
+}
+
+.tag-list-card {
+  overflow-x: auto;
+}
+
+.tag-list-card :deep(.el-table) {
+  min-width: 560px;
 }
 
 .popular-card {
@@ -447,6 +461,11 @@ const formatTagType = (type: string) => {
 }
 
 @media (max-width: 768px) {
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
   .ai-row {
     grid-template-columns: 1fr;
   }
