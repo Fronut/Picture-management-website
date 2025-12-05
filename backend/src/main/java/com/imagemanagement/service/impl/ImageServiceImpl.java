@@ -67,6 +67,7 @@ public class ImageServiceImpl implements ImageService {
     private final ExifExtractionService exifExtractionService;
     private final ThumbnailService thumbnailService;
     private final TagService tagService;
+    private static final int MAX_HIGHLIGHT_SIZE = 12;
 
     public ImageServiceImpl(ImageRepository imageRepository,
             UserRepository userRepository,
@@ -216,6 +217,20 @@ public class ImageServiceImpl implements ImageService {
         refreshThumbnails(image);
 
         return toSummaryResponse(image);
+    }
+
+    @Override
+    public List<ImageSummaryResponse> getHighlightImages(Long userId, int size) {
+        if (size <= 0) {
+            throw new BadRequestException("Size must be greater than zero");
+        }
+
+        int pageSize = Math.min(size, MAX_HIGHLIGHT_SIZE);
+        Pageable pageable = PageRequest.of(0, pageSize, Sort.by(Sort.Direction.DESC, "uploadTime"));
+        Page<Image> page = imageRepository.findByUser_IdOrderByUploadTimeDesc(userId, pageable);
+        return page.getContent().stream()
+                .map(this::toSummaryResponse)
+                .toList();
     }
 
     private Image buildImageEntity(User user, FileStorageService.StoredFileInfo storedFile,

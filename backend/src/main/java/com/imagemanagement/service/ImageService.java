@@ -19,4 +19,6 @@ public interface ImageService {
     ImageDeleteResponse deleteImage(Long userId, Long imageId);
 
     ImageSummaryResponse editImage(Long userId, Long imageId, ImageEditRequest request);
+
+    List<ImageSummaryResponse> getHighlightImages(Long userId, int size);
 }
