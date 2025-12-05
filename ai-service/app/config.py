@@ -25,6 +25,13 @@ def _float_from_env(key: str, default: float) -> float:
         return default
 
 
+def _bool_from_env(key: str, default: bool) -> bool:
+    raw = os.getenv(key)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(slots=True)
 class AppConfig:
     """Typed configuration model for the AI service."""
@@ -38,6 +45,10 @@ class AppConfig:
     download_max_mb: int = _int_from_env("IMAGE_DOWNLOAD_MAX_MB", 8)
     default_tag_limit: int = _int_from_env("TAG_MAX_RESULTS", 8)
     enable_profiler: bool = os.getenv("ENABLE_PROFILER", "false").lower() in {"1", "true", "yes"}
+    enable_vision_model: bool = _bool_from_env("ENABLE_VISION_MODEL", True)
+    vision_model_id: str = os.getenv("VISION_MODEL_ID", "openai/clip-vit-base-patch32")
+    vision_hypothesis_template: str = os.getenv("VISION_HYPOTHESIS_TEMPLATE", "This photo mainly features {}.")
+    vision_group_top_n: int = _int_from_env("VISION_GROUP_TOP_N", 2)
 
     def as_flask_config(self) -> Dict[str, Any]:
         data: Dict[str, Any] = asdict(self)
