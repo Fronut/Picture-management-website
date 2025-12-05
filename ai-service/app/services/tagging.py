@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import base64
-from dataclasses import dataclass
+import logging
 from io import BytesIO
 from typing import Iterable, List, Sequence, Tuple
 from urllib.parse import urlparse
@@ -11,30 +11,28 @@ import requests
 from PIL import Image, UnidentifiedImageError
 from werkzeug.datastructures import FileStorage
 
+from .tagging_types import TagSuggestion
+from .vision_classifier import VisionModelError, ZeroShotVisionClassifier
+
 SAFE_URL_SCHEMES = {"http", "https"}
-
-
-@dataclass(slots=True)
-class TagSuggestion:
-    name: str
-    confidence: float
-    source: str
-
-    def to_dict(self) -> dict:
-        return {
-            "name": self.name,
-            "confidence": round(float(self.confidence), 4),
-            "source": self.source,
-        }
 
 
 class TaggingService:
     """Lightweight rule-based tag suggestion engine."""
 
-    def __init__(self, max_tags: int, download_timeout: float, download_max_bytes: int) -> None:
+    def __init__(
+        self,
+        max_tags: int,
+        download_timeout: float,
+        download_max_bytes: int,
+        *,
+        vision_classifier: ZeroShotVisionClassifier | None = None,
+    ) -> None:
         self.default_limit = max(1, max_tags)
         self.download_timeout = download_timeout
         self.download_max_bytes = download_max_bytes
+        self.vision_classifier = vision_classifier
+        self._logger = logging.getLogger(__name__)
 
     def analyze(
         self,
@@ -49,6 +47,7 @@ class TaggingService:
         image = self._load_image(image_bytes)
         stats = self._extract_stats(image)
         raw_tags: List[TagSuggestion] = []
+        raw_tags.extend(self._vision_tags(image, limit))
         raw_tags.extend(self._orientation_tags(stats))
         raw_tags.extend(self._lighting_tags(stats))
         raw_tags.extend(self._color_tags(stats))
@@ -72,6 +71,16 @@ class TaggingService:
             "edge_density": round(stats["edge_density"], 3),
         }
         return tags, metadata
+
+    def _vision_tags(self, image: Image.Image, limit: int | None) -> List[TagSuggestion]:
+        if not self.vision_classifier:
+            return []
+        expanded_limit = max(self.default_limit, (limit or self.default_limit) + 3)
+        try:
+            return self.vision_classifier.classify(image, limit=expanded_limit)
+        except VisionModelError as exc:  # pragma: no cover - logged for observability only
+            self._logger.warning("Vision classifier unavailable: %s", exc)
+            return []
 
     def _resolve_image_bytes(
         self,
