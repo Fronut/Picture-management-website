@@ -60,6 +60,7 @@ class AppConfig:
     baidu_timeout_seconds: float = _float_from_env("BAIDU_TIMEOUT_SECONDS", 8.0)
     baidu_token_grace_seconds: int = _int_from_env("BAIDU_TOKEN_GRACE_SECONDS", 300)
     baidu_max_results: int = _int_from_env("BAIDU_MAX_RESULTS", 5)
+    allow_baidu_stub: bool = _bool_from_env("ALLOW_BAIDU_STUB", True)
 
     def as_flask_config(self) -> Dict[str, Any]:
         data: Dict[str, Any] = asdict(self)

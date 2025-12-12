@@ -18,6 +18,26 @@ class BaiduTokenError(RuntimeError):
     """Raised when access token retrieval fails."""
 
 
+class StubBaiduClassifier:
+    """Lightweight stub used in tests or offline environments."""
+
+    def __init__(self, *, tags: list[TagSuggestion] | None = None):
+        if tags is None:
+            tags = [
+                TagSuggestion("stub:tag1", 0.9, "baidu-stub"),
+                TagSuggestion("stub:tag2", 0.8, "baidu-stub"),
+                TagSuggestion("stub:tag3", 0.7, "baidu-stub"),
+            ]
+        self.tags = tags
+        self.called = False
+
+    def classify(self, *, image_bytes: bytes | None, image_url: str | None = None, limit: int | None = None) -> List[TagSuggestion]:
+        self.called = True
+        if limit:
+            return self.tags[:limit]
+        return self.tags
+
+
 @dataclass(slots=True)
 class _TokenCache:
     access_token: str

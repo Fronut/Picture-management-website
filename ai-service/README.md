@@ -24,6 +24,7 @@ Environment variables (defaults in parentheses):
 | Variable                                                                                              | Description                                                        |
 | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | `TAGGING_PROVIDER` (`baidu`)                                                                          | Must be `baidu` (only supported provider).                         |
+| `ALLOW_BAIDU_STUB` (`true`)                                                                           | When credentials are missing, use a local stub (for CI/offline).   |
 | `BAIDU_API_KEY` (unset)                                                                               | API Key from Baidu console; inject via env only (never commit).    |
 | `BAIDU_SECRET_KEY` (unset)                                                                            | Secret Key from Baidu console; inject via env only (never commit). |
 | `BAIDU_TOKEN_URL` (`https://aip.baidubce.com/oauth/2.0/token`)                                        | Access token endpoint.                                             |

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from dotenv import load_dotenv
 from flask import Flask
 from flask_cors import CORS
@@ -7,7 +9,7 @@ import werkzeug
 
 from .config import AppConfig, build_config
 from .routes import register_blueprints
-from .services.baidu_client import BaiduImageClassifier, BaiduTokenError
+from .services.baidu_client import BaiduImageClassifier, BaiduTokenError, StubBaiduClassifier
 from .services.search_intent import SearchIntentService
 from .services.tagging import TaggingService
 
@@ -30,12 +32,12 @@ def create_app(overrides: dict | None = None) -> Flask:
 
     # Register core services for later reuse via current_app.extensions
     tagging_provider = (config.tagging_provider or "baidu").lower()
-    baidu_classifier = None
     if tagging_provider != "baidu":
         raise RuntimeError("Only 'baidu' tagging provider is supported now")
 
-    # Allow tests to inject a stub classifier via overrides
+    # Allow tests or offline CI to inject a stub classifier
     injected_classifier = overrides.get("baidu_classifier") if overrides else None
+    baidu_classifier = None
     if injected_classifier:
         baidu_classifier = injected_classifier
     else:
@@ -50,7 +52,11 @@ def create_app(overrides: dict | None = None) -> Flask:
                 max_results=config.baidu_max_results,
             )
         except BaiduTokenError as exc:
-            raise RuntimeError(f"Baidu tagging not configured: {exc}") from exc
+            if config.allow_baidu_stub:
+                app.logger.warning("Baidu credentials missing; using stub classifier: %s", exc)
+                baidu_classifier = StubBaiduClassifier()
+            else:
+                raise RuntimeError(f"Baidu tagging not configured: {exc}") from exc
 
     app.extensions["tagging_service"] = TaggingService(
         max_tags=config.default_tag_limit,
