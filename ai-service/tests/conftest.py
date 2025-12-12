@@ -3,25 +3,28 @@ from pathlib import Path
 from typing import Callable
 
 import pytest
-from PIL import Image
 
 from app import create_app
+from app.services.tagging_types import TagSuggestion
 
 
 @dataclass(frozen=True)
 class SampleImage:
     name: str
     data: bytes
-    width: int
-    height: int
     path: Path
 
 
-@pytest.fixture()
-def client():
-    app = create_app({"TESTING": True, "enable_vision_model": False})
-    with app.test_client() as client:
-        yield client
+class DummyBaidu:
+    def __init__(self, tags: list[TagSuggestion]):
+        self.tags = tags
+        self.called = False
+
+    def classify(self, *, image_bytes=None, image_url=None, limit=None):
+        self.called = True
+        if limit:
+            return self.tags[:limit]
+        return self.tags
 
 
 @pytest.fixture(scope="session")
@@ -41,8 +44,29 @@ def load_sample_image(pictures_dir: Path) -> Callable[[str], SampleImage]:
         if not path.is_file():
             raise FileNotFoundError(f"Sample image {name} not found under {pictures_dir}")
         data = path.read_bytes()
-        with Image.open(path) as img:
-            width, height = img.size
-        return SampleImage(name=name, data=data, width=width, height=height, path=path)
+        return SampleImage(name=name, data=data, path=path)
 
     return _loader
+
+
+@pytest.fixture()
+def dummy_baidu() -> DummyBaidu:
+    tags = [
+        TagSuggestion("baidu:tag1", 0.9, "baidu"),
+        TagSuggestion("baidu:tag2", 0.8, "baidu"),
+        TagSuggestion("baidu:tag3", 0.7, "baidu"),
+    ]
+    return DummyBaidu(tags)
+
+
+@pytest.fixture()
+def client(dummy_baidu):
+    app = create_app(
+        {
+            "TESTING": True,
+            "tagging_provider": "baidu",
+            "baidu_classifier": dummy_baidu,
+        }
+    )
+    with app.test_client() as client:
+        yield client

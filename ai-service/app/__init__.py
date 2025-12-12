@@ -7,9 +7,9 @@ import werkzeug
 
 from .config import AppConfig, build_config
 from .routes import register_blueprints
+from .services.baidu_client import BaiduImageClassifier, BaiduTokenError
 from .services.search_intent import SearchIntentService
 from .services.tagging import TaggingService
-from .services.vision_classifier import VisionModelError, ZeroShotVisionClassifier
 
 
 def create_app(overrides: dict | None = None) -> Flask:
@@ -29,22 +29,34 @@ def create_app(overrides: dict | None = None) -> Flask:
     CORS(app, resources={r"/ai/*": {"origins": config.cors_allow_origins}})
 
     # Register core services for later reuse via current_app.extensions
-    vision_classifier = None
-    if config.enable_vision_model:
+    tagging_provider = (config.tagging_provider or "baidu").lower()
+    baidu_classifier = None
+    if tagging_provider != "baidu":
+        raise RuntimeError("Only 'baidu' tagging provider is supported now")
+
+    # Allow tests to inject a stub classifier via overrides
+    injected_classifier = overrides.get("baidu_classifier") if overrides else None
+    if injected_classifier:
+        baidu_classifier = injected_classifier
+    else:
         try:
-            vision_classifier = ZeroShotVisionClassifier(
-                model_id=config.vision_model_id,
-                hypothesis_template=config.vision_hypothesis_template,
-                top_per_group=config.vision_group_top_n,
+            baidu_classifier = BaiduImageClassifier(
+                api_key=config.baidu_api_key,
+                secret_key=config.baidu_secret_key,
+                token_url=config.baidu_token_url,
+                general_url=config.baidu_general_url,
+                timeout_seconds=config.baidu_timeout_seconds,
+                token_grace_seconds=config.baidu_token_grace_seconds,
+                max_results=config.baidu_max_results,
             )
-        except VisionModelError as exc:
-            app.logger.warning("Vision model disabled: %s", exc)
+        except BaiduTokenError as exc:
+            raise RuntimeError(f"Baidu tagging not configured: {exc}") from exc
 
     app.extensions["tagging_service"] = TaggingService(
         max_tags=config.default_tag_limit,
         download_timeout=config.download_timeout,
         download_max_bytes=config.download_max_bytes,
-        vision_classifier=vision_classifier,
+        baidu_classifier=baidu_classifier,
     )
     app.extensions["search_intent_service"] = SearchIntentService()
     app.extensions["app_config"] = config

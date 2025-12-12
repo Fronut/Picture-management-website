@@ -38,17 +38,28 @@ class AppConfig:
 
     app_name: str = os.getenv("APP_NAME", "picture-ai-service")
     app_version: str = os.getenv("APP_VERSION", "0.1.0")
-    model_path: str = os.getenv("MODEL_PATH", "/app/models")
     cors_allow_origins: str = os.getenv("CORS_ALLOW_ORIGINS", "*")
     max_upload_mb: int = _int_from_env("MAX_UPLOAD_MB", 15)
     download_timeout: float = _float_from_env("IMAGE_DOWNLOAD_TIMEOUT", 5.0)
     download_max_mb: int = _int_from_env("IMAGE_DOWNLOAD_MAX_MB", 8)
     default_tag_limit: int = _int_from_env("TAG_MAX_RESULTS", 8)
     enable_profiler: bool = os.getenv("ENABLE_PROFILER", "false").lower() in {"1", "true", "yes"}
-    enable_vision_model: bool = _bool_from_env("ENABLE_VISION_MODEL", True)
-    vision_model_id: str = os.getenv("VISION_MODEL_ID", "openai/clip-vit-base-patch32")
-    vision_hypothesis_template: str = os.getenv("VISION_HYPOTHESIS_TEMPLATE", "This photo mainly features {}.")
-    vision_group_top_n: int = _int_from_env("VISION_GROUP_TOP_N", 2)
+    tagging_provider: str = os.getenv("TAGGING_PROVIDER", "baidu")
+
+    # Baidu image classify API
+    baidu_api_key: str | None = os.getenv("BAIDU_API_KEY")
+    baidu_secret_key: str | None = os.getenv("BAIDU_SECRET_KEY")
+    baidu_token_url: str = os.getenv(
+        "BAIDU_TOKEN_URL",
+        "https://aip.baidubce.com/oauth/2.0/token",
+    )
+    baidu_general_url: str = os.getenv(
+        "BAIDU_ADVANCED_GENERAL_URL",
+        "https://aip.baidubce.com/rest/2.0/image-classify/v2/advanced_general",
+    )
+    baidu_timeout_seconds: float = _float_from_env("BAIDU_TIMEOUT_SECONDS", 8.0)
+    baidu_token_grace_seconds: int = _int_from_env("BAIDU_TOKEN_GRACE_SECONDS", 300)
+    baidu_max_results: int = _int_from_env("BAIDU_MAX_RESULTS", 5)
 
     def as_flask_config(self) -> Dict[str, Any]:
         data: Dict[str, Any] = asdict(self)
