@@ -30,7 +30,6 @@ def _env_bool(key: str, default: bool) -> bool:
 @dataclass(slots=True)
 class ConnectorConfig:
     api_base_url: str
-    ai_base_url: str
     api_token: str
     timeout: float
 
@@ -49,8 +48,8 @@ SEARCH_TOOL = types.Tool(
     name="search_images",
     description=(
         "Search the Picture Management library using natural language. "
-        "The tool calls the AI intent interpreter and backend /api/images/search endpoint "
-        "and returns the top matches with metadata."
+        "The tool builds filters from the query and calls backend /api/images/search "
+        "returning the top matches with metadata."
     ),
     inputSchema={
         "type": "object",
@@ -124,11 +123,6 @@ def parse_args() -> argparse.Namespace:
         help="Base URL of the Spring Boot backend (default: http://localhost:8080)",
     )
     parser.add_argument(
-        "--ai-service-url",
-        default=os.getenv("PICTURE_AI_BASE_URL", "http://localhost:5000"),
-        help="Base URL of the ai-service Flask app (default: http://localhost:5000)",
-    )
-    parser.add_argument(
         "--api-token",
         default=os.getenv("PICTURE_API_TOKEN"),
         help="JWT token used to authenticate against the backend. Required.",
@@ -153,15 +147,11 @@ def configure_runtime(args: argparse.Namespace) -> None:
     if not token:
         raise SystemExit("PICTURE_API_TOKEN (or --api-token) is required for authenticated search calls.")
     api_base = _normalize_base(args.api_base_url)
-    ai_base = _normalize_base(args.ai_service_url)
     if not api_base:
         raise SystemExit("--api-base-url cannot be empty")
-    if not ai_base:
-        raise SystemExit("--ai-service-url cannot be empty")
     global CONFIG
     CONFIG = ConnectorConfig(
         api_base_url=api_base,
-        ai_base_url=ai_base,
         api_token=token,
         timeout=max(3.0, float(args.timeout or 12)),
     )
@@ -276,9 +266,17 @@ def _fallback_interpretation(query: str) -> Dict[str, Any]:
         "query": query,
         "keywords": [query],
         "tags": [],
-        "filters": {"keyword": query, "tags": []},
-        "explanations": [{"rule": "fallback", "reason": "AI service unavailable"}],
-        "confidence": 0.0,
+        "filters": {
+            "keyword": query,
+            "tags": [],
+            "onlyOwn": False,
+            "page": 0,
+            "size": 5,
+            "sortBy": "uploadTime",
+            "sortDirection": "DESC",
+        },
+        "explanations": [{"rule": "keyword-only", "reason": "intent service removed"}],
+        "confidence": 1.0,
     }
 
 
@@ -297,12 +295,7 @@ async def execute_search(arguments: Dict[str, Any]) -> Dict[str, Any]:
     only_own = _coerce_bool(arguments.get("onlyOwn"))
 
     async with httpx.AsyncClient(timeout=config.timeout) as client:
-        interpretation: Dict[str, Any]
-        try:
-            interpretation = await _interpret_query(client, config.ai_base_url, query, limit)
-        except Exception as exc:  # pragma: no cover - informational fallback
-            logger.warning("Falling back to keyword-only filters: %s", exc)
-            interpretation = _fallback_interpretation(query)
+        interpretation = _fallback_interpretation(query)
         payload = _build_search_payload(arguments, interpretation, limit, only_own)
         page = await _search_backend(client, config, payload)
 
@@ -318,19 +311,6 @@ async def execute_search(arguments: Dict[str, Any]) -> Dict[str, Any]:
         "page": page,
         "matches": matches,
     }
-
-
-async def _interpret_query(client: httpx.AsyncClient, ai_base_url: str, query: str, limit: int) -> Dict[str, Any]:
-    url = f"{ai_base_url}/ai/v1/search/interpret"
-    response = await client.post(url, json={"query": query, "limit": limit})
-    response.raise_for_status()
-    payload = response.json()
-    if payload.get("status") != "ok":
-        raise RuntimeError(payload.get("message") or "AI service returned error response")
-    data = payload.get("data")
-    if not isinstance(data, dict):
-        raise RuntimeError("AI service returned malformed payload")
-    return data
 
 
 async def _search_backend(client: httpx.AsyncClient, config: ConnectorConfig, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -361,10 +341,9 @@ def main() -> None:
     args = parse_args()
     configure_runtime(args)
     logger.info(
-        "Starting MCP server for %s (backend=%s, ai=%s)",
+        "Starting MCP server for %s (backend=%s)",
         server.name,
         CONFIG.api_base_url if CONFIG else "?",
-        CONFIG.ai_base_url if CONFIG else "?",
     )
     try:
         anyio.run(_run_server)

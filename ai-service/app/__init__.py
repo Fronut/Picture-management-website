@@ -12,7 +12,6 @@ from .routes import register_blueprints
 from .services.baidu_client import BaiduImageClassifier, BaiduTokenError, StubBaiduClassifier
 from .services.deepseek_chat import DeepseekClient, DeepseekConfig, DeepseekSearchOrchestrator
 from .services.mcp_search import McpSearchConfig, McpSearchExecutor
-from .services.search_intent import SearchIntentService
 from .services.tagging import TaggingService
 
 
@@ -67,10 +66,6 @@ def create_app(overrides: dict | None = None) -> Flask:
         baidu_classifier=baidu_classifier,
     )
 
-    # Search intent service: allow injection for tests; default to legacy rules until LLM path is configured
-    injected_intent = overrides.get("search_intent_service") if overrides else None
-    app.extensions["search_intent_service"] = injected_intent or SearchIntentService()
-
     # Deepseek + MCP orchestrator (optional)
     deepseek_service = overrides.get("deepseek_chat_service") if overrides else None
     if not deepseek_service and config.deepseek_api_key and config.backend_api_token:
@@ -87,7 +82,6 @@ def create_app(overrides: dict | None = None) -> Flask:
                 McpSearchConfig(
                     backend_api_base_url=config.backend_api_base_url,
                     backend_api_token=config.backend_api_token,
-                    ai_service_base_url=config.ai_service_base_url,
                     timeout_seconds=config.deepseek_timeout_seconds,
                 )
             )

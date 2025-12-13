@@ -11,7 +11,6 @@ import httpx
 class McpSearchConfig:
     backend_api_base_url: str
     backend_api_token: str
-    ai_service_base_url: str
     timeout_seconds: float = 12.0
 
 
@@ -36,7 +35,7 @@ class McpSearchExecutor:
         if not query:
             raise ValueError("query is required")
         limit = max(1, min(20, int(limit or 5)))
-        interpretation = self._interpret_query(query, limit)
+        interpretation = self._basic_interpretation(query, limit, only_own)
         search_payload = self._build_search_payload(query, interpretation, limit, only_own)
         page = self._search_backend(search_payload)
         matches = page.get("content", [])
@@ -52,17 +51,24 @@ class McpSearchExecutor:
             "matches": matches,
         }
 
-    def _interpret_query(self, query: str, limit: int) -> Dict[str, Any]:
-        url = f"{self.config.ai_service_base_url}/ai/v1/search/interpret"
-        response = self.client.post(url, json={"query": query, "limit": limit})
-        response.raise_for_status()
-        payload = response.json()
-        if payload.get("status") != "ok":
-            raise RuntimeError(payload.get("message") or "AI service returned error response")
-        data = payload.get("data")
-        if not isinstance(data, dict):
-            raise RuntimeError("AI service returned malformed payload")
-        return data
+    def _basic_interpretation(self, query: str, limit: int, only_own: Optional[bool]) -> Dict[str, Any]:
+        filters: Dict[str, Any] = {
+            "keyword": query,
+            "tags": [],
+            "onlyOwn": only_own if only_own is not None else False,
+            "page": 0,
+            "size": limit,
+            "sortBy": "uploadTime",
+            "sortDirection": "DESC",
+        }
+        return {
+            "query": query,
+            "keywords": [query],
+            "tags": [],
+            "filters": filters,
+            "explanations": [{"rule": "keyword-only", "reason": "legacy intent removed"}],
+            "confidence": 1.0,
+        }
 
     def _search_backend(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         url = f"{self.config.backend_api_base_url}/api/images/search"
@@ -168,4 +174,3 @@ class StubMcpSearchExecutor(McpSearchExecutor):
         if only_own is not None:
             result["onlyOwn"] = only_own
         return result
-*** End Patch

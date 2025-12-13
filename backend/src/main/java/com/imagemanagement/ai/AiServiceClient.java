@@ -2,12 +2,9 @@ package com.imagemanagement.ai;
 
 import com.imagemanagement.ai.dto.AiHealthStatus;
 import com.imagemanagement.ai.dto.AiResponseEnvelope;
-import com.imagemanagement.ai.dto.AiSearchInterpretation;
 import com.imagemanagement.ai.dto.AiTagSuggestionResponse;
 import com.imagemanagement.config.AiServiceProperties;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -16,7 +13,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.util.Assert;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
@@ -29,9 +25,6 @@ import org.springframework.core.io.ByteArrayResource;
 public class AiServiceClient {
 
     private static final ParameterizedTypeReference<AiResponseEnvelope<AiHealthStatus>> HEALTH_TYPE =
-            new ParameterizedTypeReference<>() {
-            };
-    private static final ParameterizedTypeReference<AiResponseEnvelope<AiSearchInterpretation>> SEARCH_TYPE =
             new ParameterizedTypeReference<>() {
             };
     private static final ParameterizedTypeReference<AiResponseEnvelope<AiTagSuggestionResponse>> TAGS_TYPE =
@@ -50,19 +43,6 @@ public class AiServiceClient {
 
     public AiHealthStatus getHealth() {
         return exchange("/ai/v1/health", HttpMethod.GET, null, HEALTH_TYPE);
-    }
-
-    public AiSearchInterpretation interpretSearch(String query, Integer limit) {
-        Assert.hasText(query, "query must not be blank");
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("query", query);
-        if (limit != null && limit > 0) {
-            payload.put("limit", limit);
-        }
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(payload, headers);
-        return exchange("/ai/v1/search/interpret", HttpMethod.POST, request, SEARCH_TYPE);
     }
 
     public AiTagSuggestionResponse suggestTags(byte[] imageBytes, String filename, List<String> hints, Integer limit) {

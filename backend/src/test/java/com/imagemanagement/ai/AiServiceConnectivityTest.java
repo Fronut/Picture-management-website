@@ -1,7 +1,6 @@
 package com.imagemanagement.ai;
 
 import com.imagemanagement.ai.dto.AiHealthStatus;
-import com.imagemanagement.ai.dto.AiSearchInterpretation;
 import com.imagemanagement.ai.dto.AiTagSuggestionResponse;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -67,15 +66,6 @@ class AiServiceConnectivityTest {
         Assertions.assertThat(status.service()).isEqualTo("picture-ai-service");
         Assertions.assertThat(status.status()).isEqualTo("healthy");
         Assertions.assertThat(status.python()).isNotBlank();
-    }
-
-    @Test
-    @DisplayName("interpret endpoint should convert natural language into filters")
-    void shouldInterpretSearchQuery() {
-        AiSearchInterpretation interpretation = aiServiceClient.interpretSearch("sunset beach 4k portrait", 5);
-        Assertions.assertThat(interpretation.tags()).isNotEmpty();
-        Assertions.assertThat(interpretation.filters()).containsKeys("tags", "keyword", "minWidth", "minHeight");
-        Assertions.assertThat(interpretation.confidence()).isNotNull();
     }
 
     @Test
