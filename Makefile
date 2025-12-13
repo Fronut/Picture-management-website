@@ -9,8 +9,7 @@ help:
 	@echo "  make deploy-dev - 部署到开发环境"
 
 dev:
-	docker-compose up -d mysql redis
-	cd backend && ./mvnw spring-boot:run &
+	docker-compose up -d backend ai-service mysql redis
 	cd frontend && npm run dev
 
 build:
