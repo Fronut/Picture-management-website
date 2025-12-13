@@ -89,6 +89,10 @@ spring:
     port: 6379
 
 app:
+  jwt:
+    secret: ${JWT_SECRET:docker-dev-secret-change-me}
+    expiration: ${JWT_EXPIRATION:86400000}
+    refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
   file:
     upload-dir: /app/uploads
     max-size: 104857600
@@ -114,6 +118,9 @@ app:
     users-ttl: 30m
     images-ttl: 10m
     search-ttl: 5m
+  ai:
+    service-url: ${AI_SERVICE_URL:http://ai-service:5000}
+    timeout: ${AI_SERVICE_TIMEOUT:30000}
 
 ---
 spring:

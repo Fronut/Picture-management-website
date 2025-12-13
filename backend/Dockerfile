@@ -22,8 +22,9 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 # 复制构建产物
 COPY --from=builder /app/target/*.jar app.jar
 
-# 创建上传目录
-RUN mkdir -p /app/uploads && chown appuser:appgroup /app/uploads
+# 创建上传和缩略图目录并授权
+RUN mkdir -p /app/uploads /app/thumbnails && \
+    chown appuser:appgroup /app/uploads /app/thumbnails
 
 USER appuser
 
