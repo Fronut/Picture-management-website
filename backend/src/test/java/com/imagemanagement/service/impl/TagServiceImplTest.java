@@ -145,8 +145,22 @@ class TagServiceImplTest {
         List<ImageTagResponse> responses = tagService.getTagsForImage(image.getId());
         assertThat(responses).isNotEmpty();
         assertThat(responses).extracting(ImageTagResponse::tagName)
-                .contains("year:2023", "camera:Nikon", "location:Shanghai", "orientation:landscape");
+            .contains("year:2023", "camera:Nikon", "location:Shanghai")
+            .doesNotContain("orientation:landscape", "orientation:portrait");
     }
+
+        @Test
+        void applyAutomaticTags_shouldUseStrongConfidenceForFormatTag() {
+        tagService.applyAutomaticTags(image);
+
+        List<ImageTagResponse> responses = tagService.getTagsForImage(image.getId());
+
+        assertThat(responses).extracting(ImageTagResponse::tagName)
+            .contains("format:image/jpeg");
+        assertThat(responses).filteredOn(tag -> tag.tagName().equals("format:image/jpeg"))
+            .extracting(ImageTagResponse::confidence)
+            .containsOnly(BigDecimal.valueOf(1.00).setScale(2));
+        }
 
     @Test
     void assignCustomTags_shouldDeduplicateAndNormalizeNames() {

@@ -32,10 +32,12 @@ public class AiServiceClient {
             };
 
     private final RestTemplate restTemplate;
+    private final String serviceUrl;
 
     public AiServiceClient(RestTemplateBuilder restTemplateBuilder, AiServiceProperties properties) {
+        this.serviceUrl = properties.getServiceUrl();
         this.restTemplate = restTemplateBuilder
-                .rootUri(properties.getServiceUrl())
+            .rootUri(properties.getServiceUrl())
                 .setConnectTimeout(properties.getTimeout())
                 .setReadTimeout(properties.getTimeout())
                 .build();
@@ -88,7 +90,7 @@ public class AiServiceClient {
                     java.util.Objects.requireNonNull(targetType, "targetType must not be null"));
             return unwrap(response);
         } catch (RestClientException ex) {
-            String message = "Failed to communicate with AI service";
+            String message = String.format("Failed to communicate with AI service at %s", serviceUrl);
             if (ex instanceof HttpStatusCodeException statusException) {
                 message = String.format("AI service responded with %s: %s",
                         statusException.getStatusCode(),

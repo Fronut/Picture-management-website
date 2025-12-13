@@ -194,12 +194,8 @@ public class TagServiceImpl implements TagService {
             }
         }
 
-        if (image.getWidth() != null && image.getHeight() != null) {
-            String orientation = image.getWidth() >= image.getHeight() ? "landscape" : "portrait";
-            candidates.add(new TagCandidate("orientation:" + orientation, TagType.AUTO, CONFIDENCE_AUTO));
-        }
         if (StringUtils.hasText(image.getMimeType())) {
-            candidates.add(new TagCandidate("format:" + image.getMimeType().toLowerCase(Locale.ROOT), TagType.AUTO, CONFIDENCE_AUTO));
+            candidates.add(new TagCandidate("format:" + image.getMimeType().toLowerCase(Locale.ROOT), TagType.AUTO, CONFIDENCE_STRONG));
         }
 
         return candidates;
