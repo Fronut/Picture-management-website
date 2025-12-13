@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -26,6 +27,7 @@ class McpSearchExecutor:
             raise ValueError("BACKEND_API_TOKEN is required for MCP search")
         self.config = config
         self.client = httpx.Client(timeout=config.timeout_seconds)
+        self._available_tags: List[str] = []
 
     def close(self) -> None:  # pragma: no cover - small helper
         self.client.close()
@@ -35,7 +37,9 @@ class McpSearchExecutor:
         if not query:
             raise ValueError("query is required")
         limit = max(1, min(20, int(limit or 5)))
-        interpretation = self._basic_interpretation(query, limit, only_own)
+
+        available_tags = self._load_available_tags()
+        interpretation = self._interpretation(query, limit, only_own, available_tags)
         search_payload = self._build_search_payload(query, interpretation, limit, only_own)
         page = self._search_backend(search_payload)
         matches = page.get("content", [])
@@ -51,22 +55,31 @@ class McpSearchExecutor:
             "matches": matches,
         }
 
-    def _basic_interpretation(self, query: str, limit: int, only_own: Optional[bool]) -> Dict[str, Any]:
+    def _interpretation(self, query: str, limit: int, only_own: Optional[bool], available_tags: List[str]) -> Dict[str, Any]:
+        matched_tags = self._match_query_tags(query, available_tags)
+        tags = matched_tags
         filters: Dict[str, Any] = {
-            "keyword": query,
-            "tags": [],
+            "keyword": None if tags else query,
+            "tags": tags,
             "onlyOwn": only_own if only_own is not None else False,
             "page": 0,
             "size": limit,
             "sortBy": "uploadTime",
             "sortDirection": "DESC",
         }
+        reasons = []
+        if tags:
+            reasons.append("query-mapped-to-tags")
+        if query:
+            reasons.append("query-provided")
+        if not reasons:
+            reasons.append("fallback")
         return {
             "query": query,
-            "keywords": [query],
-            "tags": [],
+            "keywords": [query] if query else [],
+            "tags": tags,
             "filters": filters,
-            "explanations": [{"rule": "keyword-only", "reason": "legacy intent removed"}],
+            "explanations": [{"rule": reason, "reason": "applied"} for reason in reasons],
             "confidence": 1.0,
         }
 
@@ -96,7 +109,7 @@ class McpSearchExecutor:
     ) -> Dict[str, Any]:
         filters = interpretation.get("filters") or {}
         payload: Dict[str, Any] = {
-            "keyword": filters.get("keyword") or query,
+            "keyword": filters.get("keyword"),
             "privacyLevel": filters.get("privacyLevel"),
             "tags": filters.get("tags") or [],
             "uploadedFrom": filters.get("uploadedFrom"),
@@ -116,6 +129,32 @@ class McpSearchExecutor:
         if only_own_override is not None:
             payload["onlyOwn"] = only_own_override
         return payload
+
+    def _load_available_tags(self) -> List[str]:
+        if self._available_tags:
+            return self._available_tags
+        url = f"{self.config.backend_api_base_url}/api/tags/available?limit=500"
+        headers = {"Authorization": f"Bearer {self.config.backend_api_token}"}
+        response = self.client.get(url, headers=headers)
+        response.raise_for_status()
+        body = response.json()
+        data = body.get("data") or []
+        tags = [item.get("tagName") for item in data if item.get("tagName")]
+        self._available_tags = tags
+        return tags
+
+    @staticmethod
+    def _match_query_tags(query: str, available_tags: List[str]) -> List[str]:
+        if not query or not available_tags:
+            return []
+        available_map = {tag.lower(): tag for tag in available_tags}
+        tokens = [token for token in re.split(r"[^A-Za-z0-9\u4e00-\u9fa5:_]+", query) if token]
+        matches: List[str] = []
+        for token in tokens:
+            resolved = available_map.get(token.lower())
+            if resolved and resolved not in matches:
+                matches.append(resolved)
+        return matches
 
     @staticmethod
     def _format_summary(
