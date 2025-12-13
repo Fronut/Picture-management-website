@@ -54,10 +54,12 @@ def create_app(overrides: dict | None = None) -> Flask:
             )
         except BaiduTokenError as exc:
             if config.allow_baidu_stub:
-                app.logger.warning("Baidu credentials missing; using stub classifier: %s", exc)
+                app.logger.warning("Baidu credentials missing; using stub classifier because ALLOW_BAIDU_STUB=true: %s", exc)
                 baidu_classifier = StubBaiduClassifier()
             else:
-                raise RuntimeError(f"Baidu tagging not configured: {exc}") from exc
+                raise RuntimeError(
+                    "Baidu tagging is not configured; set BAIDU_API_KEY/BAIDU_SECRET_KEY or enable ALLOW_BAIDU_STUB=true for test stubs"
+                ) from exc
 
     app.extensions["tagging_service"] = TaggingService(
         max_tags=config.default_tag_limit,
