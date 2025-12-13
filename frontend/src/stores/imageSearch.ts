@@ -142,5 +142,19 @@ export const useImageSearchStore = defineStore("imageSearch", {
       next.splice(index, 1, updated);
       this.results = next;
     },
+
+    hydrateFromPage(page: PageResponse<ImageSearchResult>) {
+      this.results = page.content;
+      this.pagination = {
+        pageNumber: page.pageNumber,
+        pageSize: page.pageSize,
+        totalElements: page.totalElements,
+        totalPages: page.totalPages,
+        first: page.first,
+        last: page.last,
+      };
+      this.filters.page = page.pageNumber;
+      this.filters.size = page.pageSize;
+    },
   },
 });

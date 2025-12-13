@@ -6,6 +6,7 @@ import pytest
 
 from app import create_app
 from app.services.tagging_types import TagSuggestion
+from app.services.deepseek_chat import StubDeepseekOrchestrator
 
 
 @dataclass(frozen=True)
@@ -60,12 +61,68 @@ def dummy_baidu() -> DummyBaidu:
 
 
 @pytest.fixture()
-def client(dummy_baidu):
+def stub_deepseek() -> StubDeepseekOrchestrator:
+    canned = {
+        "summary": "demo summary",
+        "interpretation": {
+            "query": "demo",
+            "keywords": ["demo"],
+            "tags": ["stub"],
+            "filters": {"keyword": "demo", "tags": ["stub"]},
+        },
+        "searchPayload": {
+            "keyword": "demo",
+            "tags": ["stub"],
+            "onlyOwn": False,
+            "page": 0,
+            "size": 2,
+            "sortBy": "uploadTime",
+            "sortDirection": "DESC",
+        },
+        "page": {
+            "content": [
+                {
+                    "id": 1,
+                    "description": "stub image",
+                    "width": 100,
+                    "height": 100,
+                    "privacyLevel": "PUBLIC",
+                    "tags": ["stub"],
+                    "thumbnails": [],
+                }
+            ],
+            "pageNumber": 0,
+            "pageSize": 2,
+            "totalElements": 1,
+            "totalPages": 1,
+            "first": True,
+            "last": True,
+        },
+        "matches": [
+            {
+                "id": 1,
+                "description": "stub image",
+                "width": 100,
+                "height": 100,
+                "privacyLevel": "PUBLIC",
+                "tags": ["stub"],
+                "thumbnails": [],
+            }
+        ],
+        "onlyOwn": False,
+        "requestedLimit": 2,
+    }
+    return StubDeepseekOrchestrator(canned)
+
+
+@pytest.fixture()
+def client(dummy_baidu, stub_deepseek):
     app = create_app(
         {
             "TESTING": True,
             "tagging_provider": "baidu",
             "baidu_classifier": dummy_baidu,
+            "deepseek_chat_service": stub_deepseek,
         }
     )
     with app.test_client() as client:

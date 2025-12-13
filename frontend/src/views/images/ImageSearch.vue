@@ -306,7 +306,7 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { useImageSearchStore } from "@/stores/imageSearch";
 import { useImageUploadStore } from "@/stores/imageUpload";
 import ImageEditDialog from "@/components/ImageEditDialog.vue";
-import { interpretSearchQuery } from "@/services/aiService";
+import { chatSearchImages } from "@/services/aiService";
 import type {
   ImageSearchResult,
   ImageSearchPayload,
@@ -317,7 +317,7 @@ import {
   downloadThumbnail,
   deleteImage,
 } from "@/services/imageService";
-import type { AiSearchInterpretation } from "@/types/ai";
+import type { AiChatSearchResult } from "@/types/ai";
 
 const router = useRouter();
 const store = useImageSearchStore();
@@ -332,7 +332,7 @@ const dateRange = ref<[string, string] | null>(
 );
 const aiQuery = ref("");
 const aiInterpreting = ref(false);
-const aiResult = ref<AiSearchInterpretation | null>(null);
+const aiResult = ref<AiChatSearchResult | null>(null);
 
 const results = computed(() => store.results);
 const pagination = computed(() => store.pagination);
@@ -343,23 +343,10 @@ const deletingId = ref<number | null>(null);
 const editDialogVisible = ref(false);
 const editingImage = ref<ImageSearchResult | null>(null);
 const aiSummary = computed(() => {
-  if (!aiResult.value) {
-    return "";
-  }
-  const parts: string[] = [];
-  if (aiResult.value.tags && aiResult.value.tags.length) {
-    parts.push(`标签: ${aiResult.value.tags.join(", ")}`);
-  }
-  if (aiResult.value.keywords && aiResult.value.keywords.length) {
-    parts.push(`关键词: ${aiResult.value.keywords.join(", ")}`);
-  }
-  if (
-    aiResult.value.confidence !== undefined &&
-    aiResult.value.confidence !== null
-  ) {
-    parts.push(`置信度 ${(aiResult.value.confidence * 100).toFixed(0)}%`);
-  }
-  return parts.join(" | ");
+  const primary = aiResult.value?.primaryResult;
+  if (!primary) return "";
+  if (primary.summary) return primary.summary;
+  return aiResult.value?.message ?? "";
 });
 
 const thumbnailSrcMap = reactive<Record<number, string>>({});
@@ -416,9 +403,15 @@ const coerceNumber = (value: unknown): number | undefined => {
 };
 
 const buildFiltersFromInterpretation = (
-  interpretation: AiSearchInterpretation
+  result: AiChatSearchResult
 ): Partial<ImageSearchPayload> => {
-  const payload: Partial<ImageSearchPayload> = {};
+  const basePayload: Partial<ImageSearchPayload> =
+    result.primaryResult?.searchPayload ?? {};
+  const interpretation = result.primaryResult?.interpretation;
+  if (!interpretation) {
+    return basePayload;
+  }
+  const payload: Partial<ImageSearchPayload> = { ...basePayload };
   const rawFilters = interpretation.filters ?? {};
   const normalizedFilters: Record<string, unknown> = {};
   Object.entries(rawFilters).forEach(([key, value]) => {
@@ -507,9 +500,15 @@ const handleAiInterpret = async () => {
   }
   aiInterpreting.value = true;
   try {
-    const interpretation = await interpretSearchQuery(aiQuery.value, 12);
-    aiResult.value = interpretation;
-    const payload = buildFiltersFromInterpretation(interpretation);
+    const chatResult = await chatSearchImages(
+      aiQuery.value,
+      store.filters.size ?? 12,
+      store.filters.onlyOwn
+    );
+    aiResult.value = chatResult;
+    const payload = chatResult.primaryResult?.searchPayload
+      ? buildFiltersFromInterpretation(chatResult)
+      : {};
     if (payload.uploadedFrom && payload.uploadedTo) {
       dateRange.value = [payload.uploadedFrom, payload.uploadedTo];
     } else if (
@@ -518,8 +517,14 @@ const handleAiInterpret = async () => {
     ) {
       dateRange.value = null;
     }
-    await store.searchWithFilters(payload);
-    ElMessage.success("已根据 AI 建议更新搜索条件");
+    if (chatResult.primaryResult?.page) {
+      store.updateFilters({ ...store.filters, ...payload });
+      store.hydrateFromPage(chatResult.primaryResult.page);
+    } else {
+      await store.searchWithFilters(payload);
+    }
+    syncLocalFilters(store.filters);
+    ElMessage.success("已通过 Deepseek 结果更新搜索");
   } catch (error) {
     ElMessage.error(
       error instanceof Error ? error.message : "AI 解析失败，请稍后再试"

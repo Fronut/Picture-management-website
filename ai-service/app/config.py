@@ -62,6 +62,15 @@ class AppConfig:
     baidu_max_results: int = _int_from_env("BAIDU_MAX_RESULTS", 5)
     allow_baidu_stub: bool = _bool_from_env("ALLOW_BAIDU_STUB", True)
 
+    # Deepseek / MCP bridging
+    deepseek_api_key: str | None = os.getenv("DEEPSEEK_API_KEY")
+    deepseek_base_url: str = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+    deepseek_model: str = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+    deepseek_timeout_seconds: float = _float_from_env("DEEPSEEK_TIMEOUT_SECONDS", 15.0)
+    ai_service_base_url: str = os.getenv("AI_SERVICE_BASE_URL", "http://localhost:5000")
+    backend_api_base_url: str = os.getenv("BACKEND_API_BASE_URL", "http://localhost:8080")
+    backend_api_token: str | None = os.getenv("BACKEND_API_TOKEN")
+
     def as_flask_config(self) -> Dict[str, Any]:
         data: Dict[str, Any] = asdict(self)
         data["MAX_CONTENT_LENGTH"] = self.max_upload_bytes

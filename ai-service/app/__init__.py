@@ -10,6 +10,8 @@ import werkzeug
 from .config import AppConfig, build_config
 from .routes import register_blueprints
 from .services.baidu_client import BaiduImageClassifier, BaiduTokenError, StubBaiduClassifier
+from .services.deepseek_chat import DeepseekClient, DeepseekConfig, DeepseekSearchOrchestrator
+from .services.mcp_search import McpSearchConfig, McpSearchExecutor
 from .services.search_intent import SearchIntentService
 from .services.tagging import TaggingService
 
@@ -64,7 +66,36 @@ def create_app(overrides: dict | None = None) -> Flask:
         download_max_bytes=config.download_max_bytes,
         baidu_classifier=baidu_classifier,
     )
-    app.extensions["search_intent_service"] = SearchIntentService()
+
+    # Search intent service: allow injection for tests; default to legacy rules until LLM path is configured
+    injected_intent = overrides.get("search_intent_service") if overrides else None
+    app.extensions["search_intent_service"] = injected_intent or SearchIntentService()
+
+    # Deepseek + MCP orchestrator (optional)
+    deepseek_service = overrides.get("deepseek_chat_service") if overrides else None
+    if not deepseek_service and config.deepseek_api_key and config.backend_api_token:
+        try:
+            deepseek_client = DeepseekClient(
+                DeepseekConfig(
+                    api_key=config.deepseek_api_key,
+                    base_url=config.deepseek_base_url,
+                    model=config.deepseek_model,
+                    timeout_seconds=config.deepseek_timeout_seconds,
+                )
+            )
+            mcp_executor = McpSearchExecutor(
+                McpSearchConfig(
+                    backend_api_base_url=config.backend_api_base_url,
+                    backend_api_token=config.backend_api_token,
+                    ai_service_base_url=config.ai_service_base_url,
+                    timeout_seconds=config.deepseek_timeout_seconds,
+                )
+            )
+            deepseek_service = DeepseekSearchOrchestrator(deepseek_client, mcp_executor)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            app.logger.error("Failed to initialise Deepseek orchestrator: %s", exc)
+            deepseek_service = None
+    app.extensions["deepseek_chat_service"] = deepseek_service
     app.extensions["app_config"] = config
 
     register_blueprints(app)
