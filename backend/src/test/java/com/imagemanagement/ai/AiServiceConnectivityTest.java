@@ -39,6 +39,7 @@ class AiServiceConnectivityTest {
         static final GenericContainer<?> aiService = new GenericContainer<>(DockerImageName.parse("python:3.11-slim"))
             .withExposedPorts(5000)
             .withEnv("PYTHONUNBUFFERED", "1")
+            .withEnv("ALLOW_BAIDU_STUB", "true")
             .withCopyFileToContainer(MountableFile.forHostPath(AI_SERVICE_DIR), "/opt/ai-service")
             .withCommand("/bin/sh", "-c", String.join(" && ",
                 "set -e",
