@@ -14,5 +14,8 @@ public interface TagRepository extends JpaRepository<Tag, Long> {
     @Query("SELECT t FROM Tag t ORDER BY t.usageCount DESC, t.createdTime DESC")
     List<Tag> findTopTags(Pageable pageable);
 
+    @Query("SELECT t FROM Tag t WHERE t.usageCount > 0 ORDER BY t.usageCount DESC, t.createdTime DESC")
+    List<Tag> findActiveTags(Pageable pageable);
+
 }
 

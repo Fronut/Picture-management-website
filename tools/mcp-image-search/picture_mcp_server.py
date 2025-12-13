@@ -4,8 +4,9 @@ import argparse
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Tuple
 
 import anyio
 import httpx
@@ -39,53 +40,133 @@ CONFIG: ConnectorConfig | None = None
 server = Server(
     name="picture-mcp-image-search",
     version="0.1.0",
-    instructions="Use the search_images tool to describe a desired photo and retrieve matches from the Picture Management backend.",
+    instructions=(
+        "Use existing tags to find photos. Filenames/descriptions may be unrelated, so prefer listing available tags "
+        "and searching by them. Query text is optional and may not match content."
+    ),
     website_url="https://github.com/Fronut/Picture-management-website",
 )
 
 
+SEARCH_FILTER_OPTIONS = {
+    "privacyLevel": ["PUBLIC", "PRIVATE"],
+    "sortBy": ["uploadTime", "originalFilename", "fileSize", "width", "height"],
+    "sortDirection": ["ASC", "DESC"],
+}
+
+AVAILABLE_TAGS: List[str] = []
+
 SEARCH_TOOL = types.Tool(
     name="search_images",
     description=(
-        "Search the Picture Management library using natural language. "
-        "The tool builds filters from the query and calls backend /api/images/search "
-        "returning the top matches with metadata."
+        "Search the Picture Management library. Prefer explicit tags over filenames/descriptions. "
+        "Query text is optional and may not match content; tags are the primary filter."
     ),
     inputSchema={
         "type": "object",
         "properties": {
             "query": {
                 "type": "string",
-                "description": "Natural-language description of the desired photo (e.g. 'sunset beach in portrait mode').",
+                "description": (
+                    "Optional free-text hint. Filenames may be unrelated to content, so prefer tags from the library."
+                ),
             },
             "limit": {
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 20,
                 "default": 5,
-                "description": "Maximum number of images to return (capped at 20).",
+                "description": "Maximum number of images to return (maps to backend size, capped at 20).",
+            },
+            "page": {
+                "type": "integer",
+                "minimum": 0,
+                "default": 0,
+                "description": "Zero-based page index (default 0).",
             },
             "onlyOwn": {
                 "type": "boolean",
                 "description": "If true, restricts matches to the authenticated user's uploads only.",
             },
+            "privacyLevel": {
+                "type": "string",
+                "enum": SEARCH_FILTER_OPTIONS["privacyLevel"],
+                "description": "Image visibility filter (PUBLIC or PRIVATE).",
+            },
+            "tags": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Tag names to match (array of strings).",
+            },
+            "uploadedFrom": {
+                "type": "string",
+                "description": "ISO-8601 datetime lower bound (e.g. 2024-01-01T00:00:00).",
+            },
+            "uploadedTo": {
+                "type": "string",
+                "description": "ISO-8601 datetime upper bound (e.g. 2024-12-31T23:59:59).",
+            },
+            "cameraMake": {"type": "string", "description": "Camera make to match (e.g. Canon, Nikon)."},
+            "cameraModel": {"type": "string", "description": "Camera model to match (e.g. EOS R6)."},
+            "minWidth": {"type": "integer", "minimum": 1, "description": "Minimum width in pixels."},
+            "minHeight": {"type": "integer", "minimum": 1, "description": "Minimum height in pixels."},
+            "maxWidth": {"type": "integer", "minimum": 1, "description": "Maximum width in pixels."},
+            "maxHeight": {"type": "integer", "minimum": 1, "description": "Maximum height in pixels."},
+            "sortBy": {
+                "type": "string",
+                "enum": SEARCH_FILTER_OPTIONS["sortBy"],
+                "description": "Sort field (uploadTime|originalFilename|fileSize|width|height).",
+            },
+            "sortDirection": {
+                "type": "string",
+                "enum": SEARCH_FILTER_OPTIONS["sortDirection"],
+                "description": "Sort direction (ASC or DESC).",
+            },
         },
-        "required": ["query"],
+        "required": [],
         "additionalProperties": False,
     },
+)
+
+AVAILABLE_TAGS_TOOL = types.Tool(
+    name="list_available_tags",
+    description=(
+        "Return tags that already exist on images. Use these tags for searching; avoid relying on free-text queries."
+    ),
+    inputSchema={"type": "object", "properties": {}, "additionalProperties": False},
+)
+
+PARAMETERS_TOOL = types.Tool(
+    name="describe_search_parameters",
+    description="Return the available search filters, meanings, and allowed values for image search.",
+    inputSchema={"type": "object", "properties": {}, "additionalProperties": False},
 )
 
 
 @server.list_tools()
 async def _list_tools(_: types.ListToolsRequest | None = None) -> types.ListToolsResult:
-    return types.ListToolsResult(tools=[SEARCH_TOOL])
+    return types.ListToolsResult(tools=[SEARCH_TOOL, PARAMETERS_TOOL, AVAILABLE_TAGS_TOOL])
 
 
 @server.call_tool()
 async def _call_tool(name: str, arguments: dict | None) -> tuple[List[types.ContentBlock], Dict[str, Any]]:
+    payload = arguments or {}
+
+    if name == PARAMETERS_TOOL.name:
+        tags = await fetch_available_tags()
+        guide = describe_parameters(tags)
+        guide_block = types.TextContent(type="text", text=guide)
+        return [guide_block], {"description": guide, "options": {**SEARCH_FILTER_OPTIONS, "tags": tags}}
+
+    if name == AVAILABLE_TAGS_TOOL.name:
+        tags = await fetch_available_tags()
+        preview = ", ".join(tags[:50]) if tags else "(no tags available yet)"
+        text = f"Available tags ({len(tags)} total). Sample: {preview}"
+        return [types.TextContent(type="text", text=text)], {"tags": tags, "count": len(tags)}
+
     if name != SEARCH_TOOL.name:
         raise ValueError(f"Unknown tool '{name}'")
-    payload = arguments or {}
+
     result = await execute_search(payload)
     summary_block = types.TextContent(type="text", text=result["summary"])
     diagnostic_block = types.TextContent(
@@ -95,8 +176,7 @@ async def _call_tool(name: str, arguments: dict | None) -> tuple[List[types.Cont
                 "query": result["query"],
                 "requestedLimit": result["requestedLimit"],
                 "onlyOwn": result["onlyOwn"],
-                "aiTags": result["interpretation"].get("tags", []),
-                "aiKeywords": result["interpretation"].get("keywords", []),
+                "filters": result["filters"],
                 "matchCount": len(result["matches"]),
             },
             ensure_ascii=False,
@@ -108,6 +188,7 @@ async def _call_tool(name: str, arguments: dict | None) -> tuple[List[types.Cont
         "query": result["query"],
         "requestedLimit": result["requestedLimit"],
         "onlyOwn": result["onlyOwn"],
+        "filters": result["filters"],
         "interpretation": result["interpretation"],
         "searchPayload": result["searchPayload"],
         "page": result["page"],
@@ -180,6 +261,20 @@ def _coerce_int(value: Any, default: int, minimum: int, maximum: int) -> int:
         return default
 
 
+def _coerce_optional_int(value: Any, minimum: int | None = None, maximum: int | None = None) -> int | None:
+    try:
+        if value is None:
+            return None
+        parsed = int(value)
+        if minimum is not None:
+            parsed = max(minimum, parsed)
+        if maximum is not None:
+            parsed = min(maximum, parsed)
+        return parsed
+    except (TypeError, ValueError):
+        return None
+
+
 def _coerce_bool(value: Any) -> bool | None:
     if value is None:
         return None
@@ -194,6 +289,90 @@ def _coerce_bool(value: Any) -> bool | None:
     return None
 
 
+def _coerce_tags(value: Any) -> List[str] | None:
+    if value is None:
+        return None
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        return [part.strip() for part in value.split(",") if part.strip()]
+    return None
+
+
+def _coerce_enum(value: Any, options: List[str]) -> str | None:
+    if value is None:
+        return None
+    candidate = str(value).strip().upper()
+    return candidate if candidate in options else None
+
+
+def _dedup_preserve_order(items: Iterable[str]) -> List[str]:
+    seen = set()
+    result: List[str] = []
+    for item in items:
+        key = item.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(item)
+    return result
+
+
+def _match_query_tags(query: str, available_tags: List[str]) -> List[str]:
+    if not query or not available_tags:
+        return []
+    available_map = {tag.lower(): tag for tag in available_tags}
+    tokens = [token for token in re.split(r"[^A-Za-z0-9:_]+", query) if token]
+    matches = []
+    for token in tokens:
+        resolved = available_map.get(token.lower())
+        if resolved:
+            matches.append(resolved)
+    return _dedup_preserve_order(matches)
+
+
+def _interpret_request(
+    arguments: Dict[str, Any],
+    available_tags: List[str],
+    limit: int,
+    only_own_override: bool | None,
+) -> Dict[str, Any]:
+    query = (arguments.get("query") or "").strip()
+    explicit_tags = _coerce_tags(arguments.get("tags")) or []
+    matched_tags = _match_query_tags(query, available_tags)
+    tags = _dedup_preserve_order([tag for tag in explicit_tags + matched_tags if tag])
+    only_own = only_own_override if only_own_override is not None else _coerce_bool(arguments.get("onlyOwn"))
+
+    filters = {
+        "keyword": query or None,
+        "tags": tags,
+        "onlyOwn": only_own if only_own is not None else False,
+        "page": _coerce_optional_int(arguments.get("page"), minimum=0) or 0,
+        "size": limit,
+        "sortBy": _coerce_enum(arguments.get("sortBy"), SEARCH_FILTER_OPTIONS["sortBy"]) or "uploadTime",
+        "sortDirection": _coerce_enum(arguments.get("sortDirection"), SEARCH_FILTER_OPTIONS["sortDirection"]) or "DESC",
+    }
+
+    reasons = []
+    if explicit_tags:
+        reasons.append("explicit-tags")
+    if matched_tags:
+        reasons.append("query-matched-to-available-tags")
+    if query:
+        reasons.append("query-provided")
+    if not reasons:
+        reasons.append("minimal-filters")
+
+    return {
+        "query": query,
+        "keywords": [query] if query else [],
+        "tags": tags,
+        "filters": filters,
+        "explanations": [{"rule": reason, "reason": "applied"} for reason in reasons],
+        "confidence": 1.0,
+    }
+
+
 def _prefer_thumbnail(thumbnails: Iterable[Dict[str, Any]] | None) -> str | None:
     if not thumbnails:
         return None
@@ -204,13 +383,25 @@ def _prefer_thumbnail(thumbnails: Iterable[Dict[str, Any]] | None) -> str | None
     return None
 
 
-def _format_summary(query: str, interpretation: Dict[str, Any], matches: List[Dict[str, Any]], limit: int) -> str:
+def _format_summary(query: str, interpretation: Dict[str, Any], matches: List[Dict[str, Any]], limit: int, filters: Dict[str, Any]) -> str:
     tags = ", ".join(interpretation.get("tags") or []) or "n/a"
     keywords = ", ".join(interpretation.get("keywords") or []) or "n/a"
+    filter_lines = [
+        f"Privacy: {filters.get('privacyLevel') or 'any'}",
+        f"Tags: {', '.join(filters.get('tags') or []) or 'any'}",
+        f"Time: {filters.get('uploadedFrom') or '-'} to {filters.get('uploadedTo') or '-'}",
+        f"Camera: {filters.get('cameraMake') or '-'} / {filters.get('cameraModel') or '-'}",
+        f"Size: min {filters.get('minWidth') or '-'}x{filters.get('minHeight') or '-'}; max {filters.get('maxWidth') or '-'}x{filters.get('maxHeight') or '-'}",
+        f"Sort: {filters.get('sortBy') or 'uploadTime'} {filters.get('sortDirection') or 'DESC'}",
+        f"OnlyOwn: {filters.get('onlyOwn')}",
+    ]
+    query_line = query or "(none; tag-first search)"
     lines = [
-        f"Query: {query}",
+        f"Query: {query_line}",
         f"AI keywords: {keywords}",
         f"AI tags: {tags}",
+        "Filters:",
+        *[f"  - {item}" for item in filter_lines],
         f"Results: {len(matches)} of requested {limit}",
     ]
     for idx, image in enumerate(matches, start=1):
@@ -249,35 +440,47 @@ def _build_search_payload(
         "maxWidth": filters.get("maxWidth"),
         "maxHeight": filters.get("maxHeight"),
         "onlyOwn": filters.get("onlyOwn", False),
-        "page": 0,
+        "page": _coerce_optional_int(arguments.get("page"), minimum=0) or 0,
         "size": limit,
         "sortBy": filters.get("sortBy") or "uploadTime",
         "sortDirection": filters.get("sortDirection") or "DESC",
     }
     if only_own_override is not None:
         payload["onlyOwn"] = only_own_override
+
     if arguments.get("query") and not payload["keyword"]:
         payload["keyword"] = arguments["query"].strip()
+
+    privacy = _coerce_enum(arguments.get("privacyLevel"), SEARCH_FILTER_OPTIONS["privacyLevel"])
+    if privacy:
+        payload["privacyLevel"] = privacy
+
+    tags = _coerce_tags(arguments.get("tags"))
+    if tags is not None:
+        payload["tags"] = tags
+
+    for date_key in ("uploadedFrom", "uploadedTo"):
+        if arguments.get(date_key):
+            payload[date_key] = str(arguments[date_key]).strip()
+
+    for camera_key in ("cameraMake", "cameraModel"):
+        if arguments.get(camera_key):
+            payload[camera_key] = str(arguments[camera_key]).strip()
+
+    payload["minWidth"] = _coerce_optional_int(arguments.get("minWidth"), minimum=1) or payload.get("minWidth")
+    payload["minHeight"] = _coerce_optional_int(arguments.get("minHeight"), minimum=1) or payload.get("minHeight")
+    payload["maxWidth"] = _coerce_optional_int(arguments.get("maxWidth"), minimum=1) or payload.get("maxWidth")
+    payload["maxHeight"] = _coerce_optional_int(arguments.get("maxHeight"), minimum=1) or payload.get("maxHeight")
+
+    sort_by = _coerce_enum(arguments.get("sortBy"), SEARCH_FILTER_OPTIONS["sortBy"])
+    if sort_by:
+        payload["sortBy"] = sort_by
+
+    sort_dir = _coerce_enum(arguments.get("sortDirection"), SEARCH_FILTER_OPTIONS["sortDirection"])
+    if sort_dir:
+        payload["sortDirection"] = sort_dir
+
     return payload
-
-
-def _fallback_interpretation(query: str) -> Dict[str, Any]:
-    return {
-        "query": query,
-        "keywords": [query],
-        "tags": [],
-        "filters": {
-            "keyword": query,
-            "tags": [],
-            "onlyOwn": False,
-            "page": 0,
-            "size": 5,
-            "sortBy": "uploadTime",
-            "sortDirection": "DESC",
-        },
-        "explanations": [{"rule": "keyword-only", "reason": "intent service removed"}],
-        "confidence": 1.0,
-    }
 
 
 def require_non_empty(value: str, label: str) -> str:
@@ -289,18 +492,20 @@ def require_non_empty(value: str, label: str) -> str:
 async def execute_search(arguments: Dict[str, Any]) -> Dict[str, Any]:
     config = require_config()
     query = (arguments.get("query") or "").strip()
-    if not query:
-        raise ValueError("search_images.query is required")
+    explicit_tags = _coerce_tags(arguments.get("tags")) or []
+    if not query and not explicit_tags:
+        raise ValueError("Provide at least one tag or a query. Prefer tags because filenames may be unrelated.")
     limit = _coerce_int(arguments.get("limit"), default=5, minimum=1, maximum=20)
     only_own = _coerce_bool(arguments.get("onlyOwn"))
+    available_tags = await fetch_available_tags()
 
     async with httpx.AsyncClient(timeout=config.timeout) as client:
-        interpretation = _fallback_interpretation(query)
+        interpretation = _interpret_request(arguments, available_tags, limit, only_own)
         payload = _build_search_payload(arguments, interpretation, limit, only_own)
         page = await _search_backend(client, config, payload)
 
     matches = page.get("content", [])
-    summary = _format_summary(query, interpretation, matches, limit)
+    summary = _format_summary(query, interpretation, matches, limit, payload)
     return {
         "summary": summary,
         "query": query,
@@ -310,6 +515,7 @@ async def execute_search(arguments: Dict[str, Any]) -> Dict[str, Any]:
         "searchPayload": payload,
         "page": page,
         "matches": matches,
+        "filters": payload,
     }
 
 
@@ -353,3 +559,38 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+async def fetch_available_tags() -> List[str]:
+    global AVAILABLE_TAGS
+    if AVAILABLE_TAGS:
+        return AVAILABLE_TAGS
+    config = require_config()
+    url = f"{config.api_base_url}/api/tags/available?limit=500"
+    headers = {"Authorization": f"Bearer {config.api_token}"}
+    async with httpx.AsyncClient(timeout=config.timeout) as client:
+        response = await client.get(url, headers=headers)
+        response.raise_for_status()
+        body = response.json()
+        data = body.get("data") or []
+        AVAILABLE_TAGS = [item.get("tagName") for item in data if item.get("tagName")]
+    return AVAILABLE_TAGS
+
+
+def describe_parameters(available_tags: List[str]) -> str:
+    top_tags_preview = ", ".join(available_tags[:15]) if available_tags else "(none yet)"
+    lines = [
+        "Available filters and options (prefer tags; filenames may not describe content):",
+        "- tags: array of tag strings (e.g. ['cat','sunset']); available sample: " + top_tags_preview,
+        "- privacyLevel: PUBLIC | PRIVATE",
+        "- uploadedFrom / uploadedTo: ISO datetime (e.g. 2024-01-01T00:00:00)",
+        "- cameraMake / cameraModel: strings (e.g. Canon / EOS R6)",
+        "- minWidth / minHeight / maxWidth / maxHeight: integers in pixels (min 1)",
+        "- onlyOwn: boolean",
+        "- page: integer, zero-based",
+        "- limit: 1-20 (maps to size)",
+        "- sortBy: uploadTime | originalFilename | fileSize | width | height",
+        "- sortDirection: ASC | DESC",
+        "Guidance: prefer tags over query text; filenames/description may be unrelated to content.",
+        "Use list_available_tags to refresh the tag list before searching.",
+    ]
+    return "\n".join(lines)

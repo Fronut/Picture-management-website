@@ -83,6 +83,11 @@ public class TagController {
         return ResponseEntity.ok(ApiResponse.success(tagService.getPopularTags(limit)));
     }
 
+    @GetMapping("/tags/available")
+    public ResponseEntity<ApiResponse<List<TagResponse>>> getAvailableTags(@RequestParam(defaultValue = "200") int limit) {
+        return ResponseEntity.ok(ApiResponse.success(tagService.getAvailableTags(limit)));
+    }
+
     private CustomUserDetails requirePrincipal(Authentication authentication) {
         if (authentication == null || !(authentication.getPrincipal() instanceof CustomUserDetails principal)) {
             throw new BadRequestException("Authentication required");

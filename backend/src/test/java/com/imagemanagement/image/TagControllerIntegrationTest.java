@@ -164,6 +164,20 @@ class TagControllerIntegrationTest {
     }
 
     @Test
+    void getAvailableTags_shouldReturnOnlyActiveTagsWithLimit() throws Exception {
+        createTag("top", TagType.CUSTOM, 5);
+        createTag("second", TagType.CUSTOM, 2);
+        createTag("unused", TagType.CUSTOM, 0);
+
+        mockMvc.perform(get("/api/tags/available").param("limit", "2")
+                .with(authentication(buildAuthentication(owner))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data", hasSize(2)))
+                .andExpect(jsonPath("$.data[0].tagName").value("top"))
+                .andExpect(jsonPath("$.data[1].tagName").value("second"));
+    }
+
+    @Test
     void addAiTags_shouldDeduplicateAndStoreWithAiType() throws Exception {
         AiTagAssignmentRequest request = new AiTagAssignmentRequest(List.of(
                 new AiTagAssignmentRequest.TagSuggestion("Sky", new BigDecimal("0.60")),

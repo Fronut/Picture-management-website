@@ -4,10 +4,13 @@ import com.imagemanagement.ai.AiServiceClient;
 import com.imagemanagement.dto.request.AiTagAssignmentRequest;
 import com.imagemanagement.dto.request.TagAssignmentRequest;
 import com.imagemanagement.dto.response.ImageTagResponse;
-import com.imagemanagement.exception.BadRequestException;
+import com.imagemanagement.dto.response.TagResponse;
 import com.imagemanagement.entity.ExifData;
 import com.imagemanagement.entity.Image;
+import com.imagemanagement.entity.Tag;
 import com.imagemanagement.entity.User;
+import com.imagemanagement.entity.enums.TagType;
+import com.imagemanagement.exception.BadRequestException;
 import com.imagemanagement.repository.ImageRepository;
 import com.imagemanagement.repository.ImageTagRepository;
 import com.imagemanagement.repository.TagRepository;
@@ -154,6 +157,33 @@ class TagServiceImplTest {
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).tagName()).isEqualTo("City");
         assertThat(tagRepository.count()).isEqualTo(1);
+    }
+
+    @Test
+    void getAvailableTags_shouldReturnOnlyTagsWithUsageCountAndOrderByUsage() {
+        TagAssignmentRequest request = new TagAssignmentRequest(List.of("alpha", "beta", "gamma"));
+        tagService.assignCustomTags(user.getId(), image.getId(), request);
+
+        // create an unused tag
+        Tag unused = new Tag();
+        unused.setTagName("unused");
+        unused.setTagType(TagType.CUSTOM);
+        tagRepository.save(unused);
+
+        // bump usage for beta
+        Tag beta = tagRepository.findByTagNameIgnoreCase("beta").orElseThrow();
+        beta.setUsageCount(5);
+        tagRepository.save(beta);
+
+        // keep alpha usage as 1
+        Tag alpha = tagRepository.findByTagNameIgnoreCase("alpha").orElseThrow();
+        alpha.setUsageCount(1);
+        tagRepository.save(alpha);
+
+        List<TagResponse> available = tagService.getAvailableTags(10);
+
+        assertThat(available).extracting(TagResponse::tagName).doesNotContain("unused");
+        assertThat(available).extracting(TagResponse::tagName).startsWith("beta");
     }
 
     @Test

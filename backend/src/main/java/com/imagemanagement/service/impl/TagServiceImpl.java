@@ -154,6 +154,14 @@ public class TagServiceImpl implements TagService {
     }
 
     @Override
+    public List<TagResponse> getAvailableTags(int limit) {
+        int resolvedLimit = limit <= 0 ? 100 : Math.min(limit, 500);
+        return tagRepository.findActiveTags(PageRequest.of(0, resolvedLimit)).stream()
+                .map(tag -> new TagResponse(tag.getId(), tag.getTagName(), tag.getTagType(), tag.getUsageCount()))
+                .toList();
+    }
+
+    @Override
     public void applyAutomaticTags(Image image) {
         if (image == null || image.getId() == null) {
             return;

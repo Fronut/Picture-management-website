@@ -22,5 +22,7 @@ public interface TagService {
 
     List<TagResponse> getPopularTags(int limit);
 
+    List<TagResponse> getAvailableTags(int limit);
+
     void applyAutomaticTags(Image image);
 }
