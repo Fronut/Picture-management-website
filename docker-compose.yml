@@ -75,9 +75,12 @@ services:
     container_name: picture-ai-service
     ports:
       - "5000:5000"
+    env_file:
+      - ./ai-service/.env.local
     environment:
       FLASK_ENV: production
       MODEL_PATH: /app/models
+      ALLOW_BAIDU_STUB: "false"
     volumes:
       - ai_models:/app/models
     networks:
