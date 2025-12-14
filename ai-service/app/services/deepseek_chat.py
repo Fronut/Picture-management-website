@@ -6,42 +6,97 @@ from typing import Any, Dict, List, Optional
 
 from openai import OpenAI
 
-from .mcp_search import McpSearchExecutor
+from .mcp_search import (
+    MAX_PAGE_SIZE,
+    McpSearchExecutor,
+    PRIVACY_LEVELS,
+    SORT_DIRECTIONS,
+    SORT_FIELDS,
+)
 
+LIST_OPTIONS_TOOL_NAME = "list_search_options"
+SEARCH_TOOL_NAME = "search_images"
 
-DEEPSEEK_SEARCH_TOOL = [
+SEARCH_FILTER_PROPERTIES: Dict[str, Any] = {
+    "keyword": {
+        "type": "string",
+        "description": "Filename/description keyword filter. This does NOT understand image content.",
+    },
+    "privacyLevel": {
+        "type": "string",
+        "enum": PRIVACY_LEVELS,
+        "description": "Use ALL (default), PUBLIC, or PRIVATE.",
+    },
+    "tags": {
+        "type": "array",
+        "items": {"type": "string"},
+        "description": "Image tags. Call list_search_options to inspect canonical tags and reuse them verbatim.",
+    },
+    "uploadedFrom": {
+        "type": "string",
+        "description": "ISO timestamp (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS) inclusive lower bound.",
+    },
+    "uploadedTo": {
+        "type": "string",
+        "description": "ISO timestamp inclusive upper bound.",
+    },
+    "cameraMake": {"type": "string"},
+    "cameraModel": {"type": "string"},
+    "minWidth": {"type": "integer", "minimum": 1, "maximum": 20000},
+    "maxWidth": {"type": "integer", "minimum": 1, "maximum": 20000},
+    "minHeight": {"type": "integer", "minimum": 1, "maximum": 20000},
+    "maxHeight": {"type": "integer", "minimum": 1, "maximum": 20000},
+    "onlyOwn": {
+        "type": "boolean",
+        "description": "True to restrict results to the authenticated user's uploads.",
+    },
+    "page": {"type": "integer", "minimum": 0},
+    "size": {"type": "integer", "minimum": 1, "maximum": MAX_PAGE_SIZE},
+    "sortBy": {"type": "string", "enum": SORT_FIELDS},
+    "sortDirection": {"type": "string", "enum": SORT_DIRECTIONS},
+}
+
+DEEPSEEK_TOOLS = [
     {
         "type": "function",
         "function": {
-            "name": "search_images",
+            "name": LIST_OPTIONS_TOOL_NAME,
+            "description": "Fetch all available search filters, especially canonical tag names. Call this before constructing filters when uncertain.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "refresh": {
+                        "type": "boolean",
+                        "description": "Set true to refresh the cached tag list if it might be stale.",
+                    }
+                },
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": SEARCH_TOOL_NAME,
             "description": (
-                "Search the Picture Management library using natural language. "
-                "Call this tool whenever the user asks to find photos or images."
+                "Execute an image search by providing explicit filters. "
+                "Semantic intent must be encoded via tags; keyword only matches filenames/descriptions."
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Natural-language description of the desired photo",
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 20,
-                        "default": 6,
-                        "description": "Maximum number of images to return",
-                    },
-                    "onlyOwn": {
-                        "type": "boolean",
-                        "description": "Restrict results to the authenticated user's uploads",
-                    },
+                    "filters": {
+                        "type": "object",
+                        "description": "Full search payload matching the backend schema.",
+                        "properties": SEARCH_FILTER_PROPERTIES,
+                        "additionalProperties": False,
+                    }
                 },
-                "required": ["query"],
+                "required": ["filters"],
                 "additionalProperties": False,
             },
         },
-    }
+    },
 ]
 
 
@@ -77,8 +132,10 @@ class DeepseekSearchOrchestrator:
         self.mcp_executor = mcp_executor
         self.system_prompt = (
             "You are an image search copilot for a photo management site. "
-            "Use the search_images tool to fetch results instead of guessing. "
-            "Summarize findings in Chinese concisely."
+            "Rely on the provided tools only: list_search_options to learn canonical tags/filters, "
+            "and search_images to execute the query with an explicit filters object. "
+            "Tags carry semantic meaning; keyword matches filenames/descriptions only. "
+            "Never invent unsupported fields, never guess results, and always answer in concise Chinese."
         )
 
     def run_chat_search(
@@ -96,53 +153,88 @@ class DeepseekSearchOrchestrator:
             messages.extend(history)
         messages.append({"role": "user", "content": query})
 
-        first = self.client.chat(messages=messages, tools=DEEPSEEK_SEARCH_TOOL, tool_choice="auto")
+        first = self.client.chat(messages=messages, tools=DEEPSEEK_TOOLS, tool_choice="auto")
         choice = first.choices[0].message
         tool_calls = choice.tool_calls or []
         tool_call_records = [self._serialize_tool_call(call) for call in tool_calls]
-        tool_results: List[Dict[str, Any]] = []
         if not tool_calls:
-            # Model didn't call the tool; fall back to executing once with defaults
-            call_payload = {"query": query, "limit": limit, "onlyOwn": only_own}
-            tool_results.append(self._execute_tool(call_payload))
-            messages.append({"role": "assistant", "content": choice.content or ""})
-        else:
-            messages.append({"role": "assistant", "content": choice.content or "", "tool_calls": tool_calls})
-            for call in tool_calls:
-                args = self._safe_parse_args(call.function.arguments)
-                if "query" not in args or not args["query"]:
-                    args["query"] = query
-                if "limit" not in args:
-                    args["limit"] = limit
-                if only_own is not None and "onlyOwn" not in args:
-                    args["onlyOwn"] = only_own
-                result = self._execute_tool(args)
-                tool_results.append(result)
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": call.id,
-                        "name": call.function.name,
-                        "content": json.dumps(result, ensure_ascii=False),
-                    }
-                )
+            raise ValueError("Deepseek 未调用任何工具，无法完成搜索。请重试。")
 
-        follow_up = self.client.chat(messages=messages, tools=DEEPSEEK_SEARCH_TOOL, tool_choice="none")
+        messages.append({"role": "assistant", "content": choice.content or "", "tool_calls": tool_calls})
+
+        search_results: List[Dict[str, Any]] = []
+        for call in tool_calls:
+            args = self._safe_parse_args(call.function.arguments)
+            result = self._execute_tool_call(
+                name=getattr(call.function, "name", None),
+                args=args,
+                limit=limit,
+                only_own=only_own,
+            )
+            if getattr(call.function, "name", None) == SEARCH_TOOL_NAME:
+                search_results.append(result)
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call.id,
+                    "name": call.function.name,
+                    "content": json.dumps(result, ensure_ascii=False),
+                }
+            )
+
+        if not search_results:
+            raise ValueError("Deepseek 没有执行 search_images 调用，无法返回结果。")
+
+        follow_up = self.client.chat(messages=messages, tools=DEEPSEEK_TOOLS, tool_choice="none")
         final_message = follow_up.choices[0].message
-        primary_result = tool_results[-1] if tool_results else None
+        primary_result = search_results[-1]
         return {
             "message": final_message.content or "",
             "toolCalls": tool_call_records,
-            "results": tool_results,
+            "results": search_results,
             "primaryResult": primary_result,
         }
 
-    def _execute_tool(self, args: Dict[str, Any]) -> Dict[str, Any]:
-        return self.mcp_executor.search_images(
-            query=args.get("query") or "",
-            limit=args.get("limit") or 6,
-            only_own=args.get("onlyOwn"),
-        )
+    def _execute_tool_call(
+        self,
+        *,
+        name: Optional[str],
+        args: Dict[str, Any],
+        limit: int,
+        only_own: Optional[bool],
+    ) -> Dict[str, Any]:
+        if name == LIST_OPTIONS_TOOL_NAME:
+            refresh_flag = self._parse_bool(args.get("refresh")) or False
+            return self.mcp_executor.get_search_options(refresh=refresh_flag)
+        if name == SEARCH_TOOL_NAME:
+            filters = self._resolve_filters(args.get("filters"), limit=limit, only_own=only_own)
+            return self.mcp_executor.search_images(filters=filters)
+        raise ValueError(f"Unsupported tool call: {name}")
+
+    @staticmethod
+    def _resolve_filters(filters: Any, *, limit: int, only_own: Optional[bool]) -> Dict[str, Any]:
+        resolved: Dict[str, Any] = {}
+        if isinstance(filters, dict):
+            resolved.update(filters)
+        if "size" not in resolved and limit:
+            resolved["size"] = limit
+        if "page" not in resolved:
+            resolved["page"] = 0
+        if only_own is not None and "onlyOwn" not in resolved:
+            resolved["onlyOwn"] = only_own
+        return resolved
+
+    @staticmethod
+    def _parse_bool(value: Any) -> Optional[bool]:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"true", "1", "yes", "y"}:
+                return True
+            if lowered in {"false", "0", "no", "n"}:
+                return False
+        return None
 
     @staticmethod
     def _serialize_tool_call(call: Any) -> Dict[str, Any]:

@@ -48,7 +48,6 @@
                     v-for="call in message.toolCalls"
                     :key="call.id || call.function?.name"
                     type="primary"
-                    size="small"
                   >
                     <div class="tool-call">
                       <p class="tool-name">

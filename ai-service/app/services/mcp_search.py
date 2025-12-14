@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import json
-import re
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 import httpx
+
+PRIVACY_LEVELS = ["ALL", "PUBLIC", "PRIVATE"]
+SORT_FIELDS = ["uploadTime", "originalFilename", "fileSize", "width", "height"]
+SORT_DIRECTIONS = ["ASC", "DESC"]
+MAX_PAGE_SIZE = 20
+DEFAULT_PAGE_SIZE = 6
+MAX_DIMENSION = 20_000
 
 
 @dataclass(slots=True)
@@ -30,54 +36,94 @@ class McpSearchExecutor:
     def close(self) -> None:  # pragma: no cover - small helper
         self.client.close()
 
-    def search_images(self, query: str, *, limit: int = 5, only_own: Optional[bool] = None) -> Dict[str, Any]:
-        query = (query or "").strip()
-        if not query:
-            raise ValueError("query is required")
-        limit = max(1, min(20, int(limit or 5)))
+    def get_search_options(self, *, refresh: bool = False) -> Dict[str, Any]:
+        if refresh:
+            self._available_tags = []
+        tags = self._load_available_tags()
+        return {
+            "tags": tags,
+            "privacyLevels": PRIVACY_LEVELS,
+            "sortBy": SORT_FIELDS,
+            "sortDirections": SORT_DIRECTIONS,
+            "sizeRange": {"min": 1, "max": MAX_PAGE_SIZE},
+            "numericFilters": {
+                "width": {"min": 0, "max": MAX_DIMENSION},
+                "height": {"min": 0, "max": MAX_DIMENSION},
+            },
+        }
 
-        available_tags = self._load_available_tags()
-        interpretation = self._interpretation(query, limit, only_own, available_tags)
-        search_payload = self._build_search_payload(query, interpretation, limit, only_own)
-        page = self._search_backend(search_payload)
+    def search_images(self, *, filters: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(filters, dict):
+            raise ValueError("filters must be an object")
+        payload = self._normalize_filters(filters)
+        page = self._search_backend(payload)
         matches = page.get("content", [])
-        summary = self._format_summary(query, interpretation, matches, limit)
+        summary = self._format_summary(payload, matches)
+        interpretation = self._build_interpretation(payload)
         return {
             "summary": summary,
-            "query": query,
-            "requestedLimit": limit,
-            "onlyOwn": search_payload.get("onlyOwn", False),
+            "query": payload.get("keyword") or "",
+            "requestedLimit": payload.get("size"),
+            "onlyOwn": payload.get("onlyOwn"),
             "interpretation": interpretation,
-            "searchPayload": search_payload,
+            "searchPayload": payload,
             "page": page,
             "matches": matches,
         }
 
-    def _interpretation(self, query: str, limit: int, only_own: Optional[bool], available_tags: List[str]) -> Dict[str, Any]:
-        matched_tags = self._match_query_tags(query, available_tags)
-        tags = matched_tags
-        filters: Dict[str, Any] = {
-            "keyword": None if tags else query,
-            "tags": tags,
-            "onlyOwn": only_own if only_own is not None else False,
-            "page": 0,
-            "size": limit,
-            "sortBy": "uploadTime",
-            "sortDirection": "DESC",
-        }
-        reasons = []
-        if tags:
-            reasons.append("query-mapped-to-tags")
-        if query:
-            reasons.append("query-provided")
-        if not reasons:
-            reasons.append("fallback")
+    def _normalize_filters(self, filters: Dict[str, Any]) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {}
+        payload["keyword"] = self._clean_string(filters.get("keyword"))
+
+        privacy = self._clean_string(filters.get("privacyLevel"))
+        if privacy and privacy.upper() in PRIVACY_LEVELS:
+            payload["privacyLevel"] = privacy.upper()
+        else:
+            payload["privacyLevel"] = "ALL"
+
+        payload["tags"] = self._normalize_incoming_tags(filters.get("tags"))
+        payload["uploadedFrom"] = self._clean_string(filters.get("uploadedFrom"))
+        payload["uploadedTo"] = self._clean_string(filters.get("uploadedTo"))
+        payload["cameraMake"] = self._clean_string(filters.get("cameraMake"))
+        payload["cameraModel"] = self._clean_string(filters.get("cameraModel"))
+
+        for key in ("minWidth", "maxWidth", "minHeight", "maxHeight"):
+            payload[key] = self._sanitize_dimension(filters.get(key))
+
+        size = self._coerce_int(filters.get("size"))
+        if size is None:
+            size = DEFAULT_PAGE_SIZE
+        payload["size"] = max(1, min(MAX_PAGE_SIZE, size))
+
+        page = self._coerce_int(filters.get("page"))
+        payload["page"] = page if page is not None and page >= 0 else 0
+
+        only_own = self._coerce_bool(filters.get("onlyOwn"))
+        payload["onlyOwn"] = only_own if only_own is not None else False
+
+        sort_by = self._clean_string(filters.get("sortBy"))
+        payload["sortBy"] = sort_by if sort_by in SORT_FIELDS else "uploadTime"
+
+        sort_dir = self._clean_string(filters.get("sortDirection"))
+        sort_dir = sort_dir.upper() if sort_dir else None
+        payload["sortDirection"] = sort_dir if sort_dir in SORT_DIRECTIONS else "DESC"
+
+        return payload
+
+    def _build_interpretation(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        keyword = payload.get("keyword") or ""
+        tags = payload.get("tags") or []
         return {
-            "query": query,
-            "keywords": [query] if query else [],
+            "query": keyword,
+            "keywords": [keyword] if keyword else [],
             "tags": tags,
-            "filters": filters,
-            "explanations": [{"rule": reason, "reason": "applied"} for reason in reasons],
+            "filters": payload,
+            "explanations": [
+                {
+                    "rule": "llm-direct-filters",
+                    "reason": "Filters supplied directly by the copilot",
+                }
+            ],
             "confidence": 1.0,
         }
 
@@ -97,36 +143,6 @@ class McpSearchExecutor:
             raise RuntimeError("Backend returned malformed page response")
         return data
 
-    @staticmethod
-    def _build_search_payload(
-        query: str,
-        interpretation: Dict[str, Any],
-        limit: int,
-        only_own_override: Optional[bool],
-    ) -> Dict[str, Any]:
-        filters = interpretation.get("filters") or {}
-        payload: Dict[str, Any] = {
-            "keyword": filters.get("keyword"),
-            "privacyLevel": filters.get("privacyLevel"),
-            "tags": filters.get("tags") or [],
-            "uploadedFrom": filters.get("uploadedFrom"),
-            "uploadedTo": filters.get("uploadedTo"),
-            "cameraMake": filters.get("cameraMake"),
-            "cameraModel": filters.get("cameraModel"),
-            "minWidth": filters.get("minWidth"),
-            "minHeight": filters.get("minHeight"),
-            "maxWidth": filters.get("maxWidth"),
-            "maxHeight": filters.get("maxHeight"),
-            "onlyOwn": filters.get("onlyOwn", False),
-            "page": 0,
-            "size": limit,
-            "sortBy": filters.get("sortBy") or "uploadTime",
-            "sortDirection": filters.get("sortDirection") or "DESC",
-        }
-        if only_own_override is not None:
-            payload["onlyOwn"] = only_own_override
-        return payload
-
     def _load_available_tags(self) -> List[str]:
         if self._available_tags:
             return self._available_tags
@@ -139,33 +155,71 @@ class McpSearchExecutor:
         self._available_tags = tags
         return tags
 
-    @staticmethod
-    def _match_query_tags(query: str, available_tags: List[str]) -> List[str]:
-        if not query or not available_tags:
+    def _normalize_incoming_tags(self, raw_tags: Any) -> List[str]:
+        if not isinstance(raw_tags, list):
             return []
-        available_map = {tag.lower(): tag for tag in available_tags}
-        tokens = [token for token in re.split(r"[^A-Za-z0-9\u4e00-\u9fa5:_]+", query) if token]
-        matches: List[str] = []
-        for token in tokens:
-            resolved = available_map.get(token.lower())
-            if resolved and resolved not in matches:
-                matches.append(resolved)
-        return matches
+        available_map = {tag.lower(): tag for tag in self._load_available_tags()}
+        normalized: List[str] = []
+        for tag in raw_tags:
+            if not isinstance(tag, str):
+                continue
+            cleaned = tag.strip()
+            if not cleaned:
+                continue
+            resolved = available_map.get(cleaned.lower()) or cleaned
+            if resolved not in normalized:
+                normalized.append(resolved)
+        return normalized
 
     @staticmethod
-    def _format_summary(
-        query: str,
-        interpretation: Dict[str, Any],
-        matches: List[Dict[str, Any]],
-        limit: int,
-    ) -> str:
-        tags = ", ".join(interpretation.get("tags") or []) or "n/a"
-        keywords = ", ".join(interpretation.get("keywords") or []) or "n/a"
+    def _clean_string(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            stripped = value.strip()
+            return stripped or None
+        coerced = str(value).strip()
+        return coerced or None
+
+    @staticmethod
+    def _coerce_int(value: Any) -> Optional[int]:
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _coerce_bool(value: Any) -> Optional[bool]:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            lowered = value.strip().lower()
+            if lowered in {"true", "1", "yes", "y"}:
+                return True
+            if lowered in {"false", "0", "no", "n"}:
+                return False
+        return None
+
+    def _sanitize_dimension(self, value: Any) -> Optional[int]:
+        number = self._coerce_int(value)
+        if number is None or number <= 0:
+            return None
+        return min(number, MAX_DIMENSION)
+
+    @staticmethod
+    def _format_summary(filters: Dict[str, Any], matches: List[Dict[str, Any]]) -> str:
+        tags = ", ".join(filters.get("tags") or []) or "n/a"
+        keyword = filters.get("keyword") or "n/a"
+        privacy = filters.get("privacyLevel") or "n/a"
+        only_own = "是" if filters.get("onlyOwn") else "否"
         lines = [
-            f"Query: {query}",
-            f"AI keywords: {keywords}",
-            f"AI tags: {tags}",
-            f"Results: {len(matches)} of requested {limit}",
+            f"关键词: {keyword}",
+            f"标签: {tags}",
+            f"隐私: {privacy} · 仅看自己: {only_own}",
+            f"分页: page {filters.get('page')}, size {filters.get('size')}, 排序: {filters.get('sortBy')} {filters.get('sortDirection')}",
+            f"结果: {len(matches)}",
         ]
         for idx, image in enumerate(matches, start=1):
             desc = image.get("description") or image.get("originalFilename") or f"image {image.get('id')}"
@@ -204,10 +258,13 @@ class StubMcpSearchExecutor(McpSearchExecutor):
         self.client = None  # type: ignore[assignment]
         self._result = result
 
-    def search_images(self, query: str, *, limit: int = 5, only_own: Optional[bool] = None) -> Dict[str, Any]:
+    def search_images(
+        self,
+        *,
+        filters: Dict[str, Any],
+    ) -> Dict[str, Any]:
         result = json.loads(json.dumps(self._result))
-        result["query"] = query
-        result["requestedLimit"] = limit
-        if only_own is not None:
-            result["onlyOwn"] = only_own
+        result.setdefault("searchPayload", {}).update(filters)
+        result.setdefault("requestedLimit", filters.get("size"))
+        result.setdefault("onlyOwn", filters.get("onlyOwn"))
         return result
