@@ -16,7 +16,10 @@ import com.imagemanagement.exception.BadRequestException;
 import com.imagemanagement.exception.ForbiddenException;
 import com.imagemanagement.exception.ResourceNotFoundException;
 import com.imagemanagement.repository.ImageRepository;
+import com.imagemanagement.repository.ThumbnailRepository;
 import com.imagemanagement.repository.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import com.imagemanagement.repository.specification.ImageSpecifications;
 import com.imagemanagement.service.ExifExtractionService;
 import com.imagemanagement.service.FileStorageService;
@@ -66,7 +69,10 @@ public class ImageServiceImpl implements ImageService {
     private final FileStorageService fileStorageService;
     private final ExifExtractionService exifExtractionService;
     private final ThumbnailService thumbnailService;
+    private final ThumbnailRepository thumbnailRepository;
     private final TagService tagService;
+    @PersistenceContext
+    private EntityManager entityManager;
     private static final int MAX_HIGHLIGHT_SIZE = 12;
 
     public ImageServiceImpl(ImageRepository imageRepository,
@@ -74,13 +80,15 @@ public class ImageServiceImpl implements ImageService {
             FileStorageService fileStorageService,
             ExifExtractionService exifExtractionService,
             ThumbnailService thumbnailService,
-            TagService tagService) {
+            TagService tagService,
+            ThumbnailRepository thumbnailRepository) {
         this.imageRepository = imageRepository;
         this.userRepository = userRepository;
         this.fileStorageService = fileStorageService;
         this.exifExtractionService = exifExtractionService;
         this.thumbnailService = thumbnailService;
         this.tagService = tagService;
+        this.thumbnailRepository = thumbnailRepository;
     }
 
     @Override
@@ -215,6 +223,8 @@ public class ImageServiceImpl implements ImageService {
         writeImage(workingImage, imagePath, resolveOutputFormat(image));
         updateImageMetadata(image, workingImage, imagePath);
         refreshThumbnails(image);
+        entityManager.flush();
+        entityManager.refresh(image);
 
         return toSummaryResponse(image);
     }
@@ -537,6 +547,7 @@ public class ImageServiceImpl implements ImageService {
                 }
                 image.removeThumbnail(thumbnail);
             }
+            thumbnailRepository.deleteAllInBatch(existing);
         }
         thumbnailService.generateThumbnails(image);
     }
