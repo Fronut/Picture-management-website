@@ -101,7 +101,11 @@ import { storeToRefs } from "pinia";
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
-import { fetchHighlightImages } from "@/services/imageService";
+import {
+  downloadOriginalImage,
+  downloadThumbnail,
+  fetchHighlightImages,
+} from "@/services/imageService";
 import { useAuthStore } from "@/stores/auth";
 import type { ImageSearchResult } from "@/types/image";
 
@@ -109,13 +113,47 @@ const authStore = useAuthStore();
 const { user } = storeToRefs(authStore);
 const router = useRouter();
 
-const highlights = ref<ImageSearchResult[]>([]);
+type HighlightItem = ImageSearchResult & { previewUrl?: string };
+
+const highlights = ref<HighlightItem[]>([]);
 const highlightsLoading = ref(false);
+
+const revokePreviewUrls = () => {
+  highlights.value.forEach((item) => {
+    if (item.previewUrl) {
+      URL.revokeObjectURL(item.previewUrl);
+    }
+  });
+};
+
+const resolvePreviewUrl = async (image: ImageSearchResult) => {
+  const preferredThumb =
+    image.thumbnails?.find((t) => t.sizeType === "LARGE") ||
+    image.thumbnails?.[0];
+  try {
+    if (preferredThumb) {
+      const blob = await downloadThumbnail(image.id, preferredThumb.id);
+      return URL.createObjectURL(blob);
+    }
+    const original = await downloadOriginalImage(image.id);
+    return URL.createObjectURL(original);
+  } catch (error) {
+    console.error("Failed to fetch highlight image preview", error);
+    return undefined;
+  }
+};
 
 const loadHighlights = async () => {
   highlightsLoading.value = true;
   try {
-    highlights.value = await fetchHighlightImages(8);
+    const raw = await fetchHighlightImages(8);
+    revokePreviewUrls();
+    highlights.value = await Promise.all(
+      raw.map(async (item) => ({
+        ...item,
+        previewUrl: await resolvePreviewUrl(item),
+      }))
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "获取精选图片失败，请稍后再试";
@@ -137,8 +175,14 @@ const refreshHighlights = () => {
   }
 };
 
-const backgroundStyle = (path: string) => ({
-  backgroundImage: `linear-gradient(145deg, rgba(8,8,8,0.25), rgba(8,8,8,0.65)), url(${path})`,
+onUnmounted(() => {
+  revokePreviewUrls();
+});
+
+const backgroundStyle = (image: HighlightItem) => ({
+  backgroundImage: `linear-gradient(145deg, rgba(8,8,8,0.25), rgba(8,8,8,0.65)), url(${
+    image.previewUrl || image.filePath
+  })`,
 });
 
 const formatResolution = (image: ImageSearchResult) => {
