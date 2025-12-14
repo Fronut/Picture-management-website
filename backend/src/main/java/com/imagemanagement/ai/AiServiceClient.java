@@ -3,6 +3,8 @@ package com.imagemanagement.ai;
 import com.imagemanagement.ai.dto.AiHealthStatus;
 import com.imagemanagement.ai.dto.AiResponseEnvelope;
 import com.imagemanagement.ai.dto.AiTagSuggestionResponse;
+import com.imagemanagement.ai.dto.AiChatSearchResult;
+import com.imagemanagement.dto.request.AiChatRequest;
 import com.imagemanagement.config.AiServiceProperties;
 import java.util.List;
 import org.springframework.boot.web.client.RestTemplateBuilder;
@@ -30,6 +32,9 @@ public class AiServiceClient {
     private static final ParameterizedTypeReference<AiResponseEnvelope<AiTagSuggestionResponse>> TAGS_TYPE =
             new ParameterizedTypeReference<>() {
             };
+        private static final ParameterizedTypeReference<AiResponseEnvelope<AiChatSearchResult>> CHAT_TYPE =
+            new ParameterizedTypeReference<>() {
+            };
 
     private final RestTemplate restTemplate;
     private final String serviceUrl;
@@ -45,6 +50,17 @@ public class AiServiceClient {
 
     public AiHealthStatus getHealth() {
         return exchange("/ai/v1/health", HttpMethod.GET, null, HEALTH_TYPE);
+    }
+
+    public AiChatSearchResult chatSearch(AiChatRequest request) {
+        if (request == null) {
+            throw new IllegalArgumentException("request must not be null");
+        }
+        AiChatRequest normalized = request.normalized();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<AiChatRequest> entity = new HttpEntity<>(normalized, headers);
+        return exchange("/ai/v1/search/chat", HttpMethod.POST, entity, CHAT_TYPE);
     }
 
     public AiTagSuggestionResponse suggestTags(byte[] imageBytes, String filename, List<String> hints, Integer limit) {
