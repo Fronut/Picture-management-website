@@ -21,6 +21,12 @@ public class AiChatRequest {
     @Valid
     private List<AiChatMessage> messages = new ArrayList<>();
 
+    /**
+     * Bearer token propagated from the caller so downstream AI services can impersonate the user
+     * when querying internal APIs. This field is set by the backend and is never required from clients.
+     */
+    private String authToken;
+
     public String getQuery() {
         return query;
     }
@@ -53,6 +59,14 @@ public class AiChatRequest {
         this.messages = messages != null ? messages : new ArrayList<>();
     }
 
+    public String getAuthToken() {
+        return authToken;
+    }
+
+    public void setAuthToken(String authToken) {
+        this.authToken = authToken;
+    }
+
     /**
      * Create a defensive copy with defaults and sane bounds applied.
      */
@@ -63,6 +77,7 @@ public class AiChatRequest {
         copy.setLimit(resolvedLimit);
         copy.setOnlyOwn(this.onlyOwn);
         copy.setMessages(this.messages);
+        copy.setAuthToken(this.authToken);
         return copy;
     }
 }

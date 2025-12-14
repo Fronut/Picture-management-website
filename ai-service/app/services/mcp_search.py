@@ -52,11 +52,11 @@ class McpSearchExecutor:
             },
         }
 
-    def search_images(self, *, filters: Dict[str, Any]) -> Dict[str, Any]:
+    def search_images(self, *, filters: Dict[str, Any], auth_token: Optional[str] = None) -> Dict[str, Any]:
         if not isinstance(filters, dict):
             raise ValueError("filters must be an object")
         payload = self._normalize_filters(filters)
-        page = self._search_backend(payload)
+        page = self._search_backend(payload, auth_token)
         matches = page.get("content", [])
         summary = self._format_summary(payload, matches)
         interpretation = self._build_interpretation(payload)
@@ -76,10 +76,10 @@ class McpSearchExecutor:
         payload["keyword"] = self._clean_string(filters.get("keyword"))
 
         privacy = self._clean_string(filters.get("privacyLevel"))
-        if privacy and privacy.upper() in PRIVACY_LEVELS:
+        if privacy and privacy.upper() in {"PUBLIC", "PRIVATE"}:
             payload["privacyLevel"] = privacy.upper()
         else:
-            payload["privacyLevel"] = "ALL"
+            payload["privacyLevel"] = None
 
         payload["tags"] = self._normalize_incoming_tags(filters.get("tags"))
         payload["uploadedFrom"] = self._clean_string(filters.get("uploadedFrom"))
@@ -127,12 +127,15 @@ class McpSearchExecutor:
             "confidence": 1.0,
         }
 
-    def _search_backend(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    def _search_backend(self, payload: Dict[str, Any], auth_token: Optional[str]) -> Dict[str, Any]:
         url = f"{self.config.backend_api_base_url}/api/images/search"
         headers: Dict[str, str] = {
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
+        auth_header = self._resolve_auth_header(auth_token)
+        if auth_header:
+            headers["Authorization"] = auth_header
         response = self.client.post(url, headers=headers, json=payload)
         response.raise_for_status()
         body = response.json()
@@ -246,6 +249,15 @@ class McpSearchExecutor:
                 return str(path)
         return None
 
+    def _resolve_auth_header(self, auth_token: Optional[str]) -> Optional[str]:
+        token = auth_token or self.config.backend_api_token
+        if not token:
+            return None
+        token = token.strip()
+        if not token:
+            return None
+        return token if token.lower().startswith("bearer ") else f"Bearer {token}"
+
     # No auth headers needed; backend endpoints are open in this environment.
 
 
@@ -262,6 +274,7 @@ class StubMcpSearchExecutor(McpSearchExecutor):
         self,
         *,
         filters: Dict[str, Any],
+        auth_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         result = json.loads(json.dumps(self._result))
         result.setdefault("searchPayload", {}).update(filters)

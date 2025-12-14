@@ -17,13 +17,24 @@ def chat_search():
     limit = _safe_int(payload.get("limit")) or 6
     only_own = payload.get("onlyOwn")
     messages = payload.get("messages") if isinstance(payload.get("messages"), list) else None
+    auth_token = payload.get("authToken")
+    if isinstance(auth_token, str):
+        auth_token = auth_token.strip() or None
+    else:
+        auth_token = None
 
     orchestrator: DeepseekSearchOrchestrator | None = current_app.extensions.get("deepseek_chat_service")
     if orchestrator is None:
         return jsonify({"status": "error", "message": "Deepseek integration is not configured"}), 503
 
     try:
-        result = orchestrator.run_chat_search(query=query, limit=limit, only_own=only_own, history=messages)
+        result = orchestrator.run_chat_search(
+            query=query,
+            limit=limit,
+            only_own=only_own,
+            history=messages,
+            auth_token=auth_token,
+        )
     except ValueError as exc:
         return jsonify({"status": "error", "message": str(exc)}), 400
     except Exception as exc:  # pragma: no cover - runtime safety

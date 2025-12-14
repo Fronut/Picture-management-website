@@ -145,6 +145,7 @@ class DeepseekSearchOrchestrator:
         limit: int = 6,
         only_own: Optional[bool] = None,
         history: Optional[List[Dict[str, Any]]] = None,
+        auth_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         if not query.strip():
             raise ValueError("query is required")
@@ -153,43 +154,94 @@ class DeepseekSearchOrchestrator:
             messages.extend(history)
         messages.append({"role": "user", "content": query})
 
-        first = self.client.chat(messages=messages, tools=DEEPSEEK_TOOLS, tool_choice="auto")
-        choice = first.choices[0].message
-        tool_calls = choice.tool_calls or []
-        tool_call_records = [self._serialize_tool_call(call) for call in tool_calls]
-        if not tool_calls:
-            raise ValueError("Deepseek 未调用任何工具，无法完成搜索。请重试。")
-
-        messages.append({"role": "assistant", "content": choice.content or "", "tool_calls": tool_calls})
-
         search_results: List[Dict[str, Any]] = []
-        for call in tool_calls:
-            args = self._safe_parse_args(call.function.arguments)
-            result = self._execute_tool_call(
-                name=getattr(call.function, "name", None),
-                args=args,
-                limit=limit,
-                only_own=only_own,
-            )
-            if getattr(call.function, "name", None) == SEARCH_TOOL_NAME:
-                search_results.append(result)
-            messages.append(
+        tool_call_records: List[Dict[str, Any]] = []
+        final_message = None
+        nudges_without_search = 0
+        fallback_reason: Optional[str] = None
+        loop_exhausted = True
+
+        for _ in range(10):
+            response = self.client.chat(messages=messages, tools=DEEPSEEK_TOOLS, tool_choice="auto")
+            choice = response.choices[0].message
+            tool_calls = choice.tool_calls or []
+            assistant_message: Dict[str, Any] = {"role": "assistant", "content": choice.content or ""}
+            if tool_calls:
+                assistant_message["tool_calls"] = tool_calls
+            messages.append(assistant_message)
+
+            if not tool_calls:
+                if not search_results and nudges_without_search < 2:
+                    nudges_without_search += 1
+                    messages.append(
+                        {
+                            "role": "system",
+                            "content": (
+                                "请不要直接回答。务必先调用 list_search_options 和 search_images 工具，"
+                                "在获得真实的检索结果后再进行总结。"
+                            ),
+                        }
+                    )
+                    continue
+                if not search_results and nudges_without_search >= 2:
+                    fallback_reason = "missing_search_call"
+                final_message = choice
+                loop_exhausted = False
+                break
+
+            for call in tool_calls:
+                serialized = self._serialize_tool_call(call)
+                if serialized:
+                    tool_call_records.append(serialized)
+                args = self._safe_parse_args(call.function.arguments)
+                result = self._execute_tool_call(
+                    name=getattr(call.function, "name", None),
+                    args=args,
+                    limit=limit,
+                    only_own=only_own,
+                    auth_token=auth_token,
+                )
+                if getattr(call.function, "name", None) == SEARCH_TOOL_NAME:
+                    search_results.append(result)
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": call.id,
+                        "name": call.function.name,
+                        "content": json.dumps(result, ensure_ascii=False),
+                    }
+                )
+        if loop_exhausted and not search_results:
+            fallback_reason = fallback_reason or "max_iterations"
+
+        forced_fallback = False
+        if not search_results:
+            forced_fallback = True
+            fallback_filters = self._resolve_filters({}, limit=limit, only_own=only_own)
+            fallback_result = self.mcp_executor.search_images(filters=fallback_filters, auth_token=auth_token)
+            search_results.append(fallback_result)
+            tool_call_records.append(
                 {
-                    "role": "tool",
-                    "tool_call_id": call.id,
-                    "name": call.function.name,
-                    "content": json.dumps(result, ensure_ascii=False),
+                    "id": "forced-search",
+                    "type": "function",
+                    "function": {
+                        "name": SEARCH_TOOL_NAME,
+                        "arguments": json.dumps({"filters": fallback_filters}, ensure_ascii=False),
+                    },
                 }
             )
 
-        if not search_results:
-            raise ValueError("Deepseek 没有执行 search_images 调用，无法返回结果。")
-
-        follow_up = self.client.chat(messages=messages, tools=DEEPSEEK_TOOLS, tool_choice="none")
-        final_message = follow_up.choices[0].message
+        final_text = final_message.content if final_message and final_message.content else ""
+        if forced_fallback:
+            notice = "Deepseek 未按要求调用 search_images，我已直接执行默认搜索。"
+            if fallback_reason == "max_iterations":
+                notice = "Deepseek 工具调用次数达到上限，我已直接执行默认搜索。"
+            final_text = f"{final_text}\n\n{notice}".strip() if final_text else notice
+        elif not final_text:
+            final_text = "搜索完成，以下是最新的检索结果。"
         primary_result = search_results[-1]
         return {
-            "message": final_message.content or "",
+            "message": final_text,
             "toolCalls": tool_call_records,
             "results": search_results,
             "primaryResult": primary_result,
@@ -202,13 +254,14 @@ class DeepseekSearchOrchestrator:
         args: Dict[str, Any],
         limit: int,
         only_own: Optional[bool],
+        auth_token: Optional[str],
     ) -> Dict[str, Any]:
         if name == LIST_OPTIONS_TOOL_NAME:
             refresh_flag = self._parse_bool(args.get("refresh")) or False
             return self.mcp_executor.get_search_options(refresh=refresh_flag)
         if name == SEARCH_TOOL_NAME:
             filters = self._resolve_filters(args.get("filters"), limit=limit, only_own=only_own)
-            return self.mcp_executor.search_images(filters=filters)
+            return self.mcp_executor.search_images(filters=filters, auth_token=auth_token)
         raise ValueError(f"Unsupported tool call: {name}")
 
     @staticmethod
@@ -276,6 +329,7 @@ class StubDeepseekOrchestrator(DeepseekSearchOrchestrator):
         limit: int = 6,
         only_own: Optional[bool] = None,
         history: Optional[List[Dict[str, Any]]] = None,
+        auth_token: Optional[str] = None,
     ) -> Dict[str, Any]:
         result = json.loads(json.dumps(self.canned_result))
         result["query"] = query
