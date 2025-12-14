@@ -11,7 +11,7 @@ import httpx
 @dataclass(slots=True)
 class McpSearchConfig:
     backend_api_base_url: str
-    backend_api_token: str
+    backend_api_token: Optional[str] = None
     timeout_seconds: float = 12.0
 
 
@@ -23,8 +23,6 @@ class McpSearchExecutor:
     """
 
     def __init__(self, config: McpSearchConfig) -> None:
-        if not config.backend_api_token:
-            raise ValueError("BACKEND_API_TOKEN is required for MCP search")
         self.config = config
         self.client = httpx.Client(timeout=config.timeout_seconds)
         self._available_tags: List[str] = []
@@ -85,8 +83,7 @@ class McpSearchExecutor:
 
     def _search_backend(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         url = f"{self.config.backend_api_base_url}/api/images/search"
-        headers = {
-            "Authorization": f"Bearer {self.config.backend_api_token}",
+        headers: Dict[str, str] = {
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
@@ -134,8 +131,7 @@ class McpSearchExecutor:
         if self._available_tags:
             return self._available_tags
         url = f"{self.config.backend_api_base_url}/api/tags/available?limit=500"
-        headers = {"Authorization": f"Bearer {self.config.backend_api_token}"}
-        response = self.client.get(url, headers=headers)
+        response = self.client.get(url)
         response.raise_for_status()
         body = response.json()
         data = body.get("data") or []
@@ -195,6 +191,8 @@ class McpSearchExecutor:
             if path:
                 return str(path)
         return None
+
+    # No auth headers needed; backend endpoints are open in this environment.
 
 
 class StubMcpSearchExecutor(McpSearchExecutor):

@@ -43,8 +43,8 @@ public class ImageController {
             @RequestParam(value = "description", required = false) String description,
             Authentication authentication) {
 
-        CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
-        List<ImageUploadResponse> responses = imageService.uploadImages(principal.getId(), files, privacyLevel, description);
+        Long userId = requireUserId(authentication);
+        List<ImageUploadResponse> responses = imageService.uploadImages(userId, files, privacyLevel, description);
         return ResponseEntity.ok(ApiResponse.success(responses));
     }
 
@@ -53,8 +53,8 @@ public class ImageController {
             @Valid @RequestBody ImageSearchRequest request,
             Authentication authentication) {
 
-        CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
-        PageResponse<ImageSummaryResponse> page = imageService.searchImages(principal.getId(), request);
+        Long userId = resolveUserId(authentication);
+        PageResponse<ImageSummaryResponse> page = imageService.searchImages(userId, request);
         return ResponseEntity.ok(ApiResponse.success(page));
     }
 
@@ -64,8 +64,8 @@ public class ImageController {
             @Valid @RequestBody ImageEditRequest request,
             Authentication authentication) {
 
-        CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
-        ImageSummaryResponse response = imageService.editImage(principal.getId(), imageId, request);
+        Long userId = requireUserId(authentication);
+        ImageSummaryResponse response = imageService.editImage(userId, imageId, request);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -73,8 +73,8 @@ public class ImageController {
     public ResponseEntity<ApiResponse<ImageDeleteResponse>> deleteImage(
             @PathVariable Long imageId,
             Authentication authentication) {
-        CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
-        ImageDeleteResponse response = imageService.deleteImage(principal.getId(), imageId);
+        Long userId = requireUserId(authentication);
+        ImageDeleteResponse response = imageService.deleteImage(userId, imageId);
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
@@ -82,8 +82,27 @@ public class ImageController {
     public ResponseEntity<ApiResponse<List<ImageSummaryResponse>>> getHighlights(
             @RequestParam(value = "size", defaultValue = "6") int size,
             Authentication authentication) {
-        CustomUserDetails principal = (CustomUserDetails) authentication.getPrincipal();
-        List<ImageSummaryResponse> highlights = imageService.getHighlightImages(principal.getId(), size);
+        Long userId = resolveUserId(authentication);
+        List<ImageSummaryResponse> highlights = imageService.getHighlightImages(userId, size);
         return ResponseEntity.ok(ApiResponse.success(highlights));
+    }
+
+    private Long resolveUserId(Authentication authentication) {
+        if (authentication == null) {
+            return null;
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof CustomUserDetails customUserDetails) {
+            return customUserDetails.getId();
+        }
+        return null;
+    }
+
+    private Long requireUserId(Authentication authentication) {
+        Long userId = resolveUserId(authentication);
+        if (userId == null) {
+            throw new com.imagemanagement.exception.UnauthorizedException("User authentication is required");
+        }
+        return userId;
     }
 }

@@ -70,7 +70,7 @@ def create_app(overrides: dict | None = None) -> Flask:
 
     # Deepseek + MCP orchestrator (optional)
     deepseek_service = overrides.get("deepseek_chat_service") if overrides else None
-    if not deepseek_service and config.deepseek_api_key and config.backend_api_token:
+    if not deepseek_service and config.deepseek_api_key:
         try:
             deepseek_client = DeepseekClient(
                 DeepseekConfig(

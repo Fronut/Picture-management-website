@@ -21,7 +21,7 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const status = error?.response?.status;
-    if (status === 401 || status === 403) {
+    if (status === 401) {
       const authStore = useAuthStore();
       await authStore.logout({ silent: true, notifyServer: false });
       router.replace({
