@@ -1,6 +1,11 @@
 import type { PageResponse } from "./api";
 import type { ImageSearchPayload, ImageSearchResult } from "./image";
 
+export interface AiChatMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+}
+
 export interface AiSearchInterpretation {
   query: string;
   keywords?: string[];
@@ -10,15 +15,31 @@ export interface AiSearchInterpretation {
   confidence?: number;
 }
 
+export interface AiToolFunction {
+  name?: string;
+  arguments?: string;
+}
+
+export interface AiToolCall {
+  id?: string;
+  type?: string;
+  function?: AiToolFunction;
+}
+
+export interface AiChatPrimaryResult {
+  summary?: string;
+  query?: string;
+  interpretation?: AiSearchInterpretation;
+  searchPayload?: Partial<ImageSearchPayload>;
+  page?: PageResponse<ImageSearchResult>;
+  matches?: ImageSearchResult[];
+  requestedLimit?: number;
+  onlyOwn?: boolean;
+}
+
 export interface AiChatSearchResult {
   message: string;
-  primaryResult: {
-    summary: string;
-    interpretation: AiSearchInterpretation;
-    searchPayload: Partial<ImageSearchPayload>;
-    page: PageResponse<ImageSearchResult>;
-    matches: ImageSearchResult[];
-    requestedLimit?: number;
-  } | null;
-  results: Array<Record<string, unknown>>;
+  primaryResult: AiChatPrimaryResult | null;
+  results: AiChatPrimaryResult[];
+  toolCalls?: AiToolCall[];
 }

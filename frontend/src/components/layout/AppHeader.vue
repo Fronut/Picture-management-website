@@ -24,6 +24,9 @@
         <el-button type="primary" plain @click="navigateTo('/images/search')">
           搜索图片
         </el-button>
+        <el-button type="warning" plain @click="navigateTo('/ai/chat')">
+          AI 对话
+        </el-button>
         <el-button type="primary" @click="handleLogout"> Logout </el-button>
       </el-space>
     </template>

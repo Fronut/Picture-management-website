@@ -48,6 +48,9 @@
                 show-icon
                 class="ai-summary"
               />
+              <el-link type="primary" :underline="false" @click="goAiChat">
+                打开完整对话模式
+              </el-link>
             </el-form-item>
 
             <el-form-item label="标签">
@@ -672,6 +675,10 @@ const thumbnailUrl = (image: ImageSearchResult) => {
 
 const goToTagManager = (imageId: number) => {
   router.push({ name: "image-tags", params: { imageId } });
+};
+
+const goAiChat = () => {
+  router.push({ name: "ai-chat" });
 };
 
 const openEditDialog = (image: ImageSearchResult) => {

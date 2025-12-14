@@ -29,6 +29,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: "/ai/chat",
+      name: "ai-chat",
+      component: () => import("@/views/ai/AiChat.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
       path: "/images/:imageId/tags",
       name: "image-tags",
       component: () => import("@/views/ImageTagManager.vue"),
