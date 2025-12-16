@@ -84,6 +84,7 @@ class ImageDetailControllerTest {
                 .andExpect(jsonPath("$.data.tagDetails.length()").value(1))
                 .andExpect(jsonPath("$.data.tagDetails[0].tagName").value(tag.getTagName()))
                 .andExpect(jsonPath("$.data.access.canEdit").value(true))
+                .andExpect(jsonPath("$.data.access.canManageTags").value(true))
                 .andExpect(jsonPath("$.data.summary.thumbnails.length()").value(1));
     }
 

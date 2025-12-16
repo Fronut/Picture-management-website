@@ -326,6 +326,7 @@ public class ImageServiceImpl implements ImageService {
         accessInfo.setCanEdit(isOwner);
         accessInfo.setCanDelete(isOwner);
         accessInfo.setCanDownloadOriginal(isOwner || image.getPrivacyLevel() == ImagePrivacyLevel.PUBLIC);
+        accessInfo.setCanManageTags(isOwner);
         return accessInfo;
     }
 

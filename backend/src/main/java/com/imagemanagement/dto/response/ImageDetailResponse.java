@@ -243,6 +243,7 @@ public class ImageDetailResponse {
         private boolean canEdit;
         private boolean canDelete;
         private boolean canDownloadOriginal;
+        private boolean canManageTags;
 
         public boolean isCanEdit() {
             return canEdit;
@@ -266,6 +267,14 @@ public class ImageDetailResponse {
 
         public void setCanDownloadOriginal(boolean canDownloadOriginal) {
             this.canDownloadOriginal = canDownloadOriginal;
+        }
+
+        public boolean isCanManageTags() {
+            return canManageTags;
+        }
+
+        public void setCanManageTags(boolean canManageTags) {
+            this.canManageTags = canManageTags;
         }
     }
 }
