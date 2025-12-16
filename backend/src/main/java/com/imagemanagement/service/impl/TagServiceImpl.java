@@ -82,7 +82,7 @@ public class TagServiceImpl implements TagService {
         Objects.requireNonNull(userId, "userId cannot be null");
         Objects.requireNonNull(imageId, "imageId cannot be null");
         Image image = loadAccessibleImage(userId, imageId);
-        List<TagCandidate> candidates = toCandidates(request.tagNames(), TagType.CUSTOM, CONFIDENCE_STRONG);
+        List<TagCandidate> candidates = toCustomCandidates(request.tags());
         attachCandidates(image, candidates);
         return getTagsForImage(imageId);
     }
@@ -316,13 +316,17 @@ public class TagServiceImpl implements TagService {
         tagRepository.save(tag);
     }
 
-    private List<TagCandidate> toCandidates(List<String> tagNames, TagType tagType, BigDecimal confidence) {
-        if (CollectionUtils.isEmpty(tagNames)) {
-            throw new BadRequestException("tagNames cannot be empty");
+    private List<TagCandidate> toCustomCandidates(List<TagAssignmentRequest.TagInput> inputs) {
+        if (CollectionUtils.isEmpty(inputs)) {
+            throw new BadRequestException("tags cannot be empty");
         }
-        return tagNames.stream()
-                .filter(StringUtils::hasText)
-                .map(name -> new TagCandidate(name, tagType, confidence))
+        return inputs.stream()
+                .filter(Objects::nonNull)
+                .filter(input -> StringUtils.hasText(input.name()))
+                .map(input -> new TagCandidate(
+                        input.name(),
+                        TagType.CUSTOM,
+                        normalizeConfidence(input.confidence(), CONFIDENCE_STRONG)))
                 .toList();
     }
 
