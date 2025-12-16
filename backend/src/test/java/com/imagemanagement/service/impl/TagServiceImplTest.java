@@ -80,7 +80,10 @@ class TagServiceImplTest {
 
     @Test
     void assignCustomTags_shouldCreateTagsAndAssociations() {
-        TagAssignmentRequest request = new TagAssignmentRequest(List.of("Travel", " Sunset "));
+        TagAssignmentRequest request = new TagAssignmentRequest(List.of(
+            new TagAssignmentRequest.TagInput("Travel", null),
+            new TagAssignmentRequest.TagInput(" Sunset ", BigDecimal.valueOf(0.6))
+        ));
 
         List<ImageTagResponse> responses = tagService.assignCustomTags(user.getId(), image.getId(), request);
 
@@ -92,7 +95,9 @@ class TagServiceImplTest {
 
     @Test
     void removeTag_shouldDetachAssociationAndDecrementUsage() {
-        TagAssignmentRequest request = new TagAssignmentRequest(List.of("Portrait"));
+        TagAssignmentRequest request = new TagAssignmentRequest(List.of(
+            new TagAssignmentRequest.TagInput("Portrait", null)
+        ));
         tagService.assignCustomTags(user.getId(), image.getId(), request);
 
         Long tagId = Objects.requireNonNull(tagRepository.findByTagNameIgnoreCase("Portrait").orElseThrow().getId());
@@ -164,7 +169,11 @@ class TagServiceImplTest {
 
     @Test
     void assignCustomTags_shouldDeduplicateAndNormalizeNames() {
-        TagAssignmentRequest request = new TagAssignmentRequest(List.of(" City ", "city", "CITY"));
+        TagAssignmentRequest request = new TagAssignmentRequest(List.of(
+            new TagAssignmentRequest.TagInput(" City ", BigDecimal.valueOf(0.5)),
+            new TagAssignmentRequest.TagInput("city", BigDecimal.ONE),
+            new TagAssignmentRequest.TagInput("CITY", null)
+        ));
 
         List<ImageTagResponse> responses = tagService.assignCustomTags(user.getId(), image.getId(), request);
 
@@ -175,7 +184,11 @@ class TagServiceImplTest {
 
     @Test
     void getAvailableTags_shouldReturnOnlyTagsWithUsageCountAndOrderByUsage() {
-        TagAssignmentRequest request = new TagAssignmentRequest(List.of("alpha", "beta", "gamma"));
+        TagAssignmentRequest request = new TagAssignmentRequest(List.of(
+            new TagAssignmentRequest.TagInput("alpha", null),
+            new TagAssignmentRequest.TagInput("beta", BigDecimal.valueOf(0.8)),
+            new TagAssignmentRequest.TagInput("gamma", BigDecimal.ONE)
+        ));
         tagService.assignCustomTags(user.getId(), image.getId(), request);
 
         // create an unused tag

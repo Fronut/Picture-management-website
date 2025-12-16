@@ -115,7 +115,10 @@ class TagControllerIntegrationTest {
 
     @Test
     void addCustomTags_shouldAttachTagsForOwner() throws Exception {
-        TagAssignmentRequest payload = new TagAssignmentRequest(List.of("Travel", "Portrait"));
+        TagAssignmentRequest payload = new TagAssignmentRequest(List.of(
+            new TagAssignmentRequest.TagInput("Travel", new BigDecimal("0.80")),
+            new TagAssignmentRequest.TagInput("Portrait", null)
+        ));
 
         mockMvc.perform(post("/api/images/{imageId}/tags/custom", image.getId())
                         .with(authentication(buildAuthentication(owner)))
@@ -131,7 +134,9 @@ class TagControllerIntegrationTest {
 
     @Test
     void deleteTag_shouldRemoveAssociationAndDecrementUsage() throws Exception {
-        TagAssignmentRequest payload = new TagAssignmentRequest(List.of("Macro"));
+        TagAssignmentRequest payload = new TagAssignmentRequest(List.of(
+            new TagAssignmentRequest.TagInput("Macro", BigDecimal.ONE)
+        ));
         var createResult = mockMvc.perform(post("/api/images/{imageId}/tags/custom", image.getId())
                         .with(authentication(buildAuthentication(owner)))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -222,7 +227,9 @@ class TagControllerIntegrationTest {
     @Test
     void addCustomTags_shouldRejectWhenUserDoesNotOwnImage() throws Exception {
         User otherUser = persistUser("intruder", "intruder@example.com");
-        TagAssignmentRequest payload = new TagAssignmentRequest(List.of("Forbidden"));
+        TagAssignmentRequest payload = new TagAssignmentRequest(List.of(
+            new TagAssignmentRequest.TagInput("Forbidden", null)
+        ));
 
         mockMvc.perform(post("/api/images/{imageId}/tags/custom", image.getId())
                         .with(authentication(buildAuthentication(otherUser)))
