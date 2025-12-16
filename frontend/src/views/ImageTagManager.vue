@@ -203,7 +203,7 @@
               <el-input-number
                 v-model="aiGenerateLimit"
                 :min="1"
-                :max="20"
+                :max="MAX_AI_TAG_LIMIT"
                 :step="1"
               />
             </el-form-item>
@@ -244,6 +244,8 @@ const {
   aiGenerating,
 } = storeToRefs(tagStore);
 
+const MAX_AI_TAG_LIMIT = 5;
+
 const imageId = computed(() => {
   const raw = Number(route.params.imageId);
   return Number.isNaN(raw) ? null : raw;
@@ -278,7 +280,27 @@ const createDraft = (
 
 const tagDrafts = ref<TagDraftInput[]>([createDraft()]);
 const aiHints = ref<string[]>([]);
-const aiGenerateLimit = ref<number>(6);
+const aiGenerateLimit = ref<number>(MAX_AI_TAG_LIMIT);
+
+const clampAiLimit = (value: number | null | undefined): number => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return MAX_AI_TAG_LIMIT;
+  }
+  if (value < 1) {
+    return 1;
+  }
+  if (value > MAX_AI_TAG_LIMIT) {
+    return MAX_AI_TAG_LIMIT;
+  }
+  return Math.trunc(value);
+};
+
+watch(aiGenerateLimit, (value) => {
+  const normalized = clampAiLimit(value);
+  if (normalized !== value) {
+    aiGenerateLimit.value = normalized;
+  }
+});
 
 const resetDrafts = () => {
   tagDrafts.value = [createDraft()];
@@ -385,8 +407,10 @@ const handleGenerateAi = () => {
   if (hints.length) {
     payload.hints = hints;
   }
-  if (aiGenerateLimit.value && aiGenerateLimit.value > 0) {
-    payload.limit = aiGenerateLimit.value;
+  const normalizedLimit = clampAiLimit(aiGenerateLimit.value);
+  if (normalizedLimit && normalizedLimit > 0) {
+    payload.limit = normalizedLimit;
+    aiGenerateLimit.value = normalizedLimit;
   }
   tagStore.generateAi(payload);
 };
