@@ -109,6 +109,34 @@ class ImageEditControllerTest {
                 .forEach(thumbnail -> assertThat(Files.exists(Path.of(thumbnail.getFilePath()))).isTrue());
     }
 
+            @Test
+            void editImage_shouldRotateAndRegenerateThumbnails() throws Exception {
+            persistUser();
+            String token = loginAndGetToken();
+            long imageId = uploadSampleImage(token, "edit-rotate.png", 2, 4);
+
+            String payload = "{" +
+                "\"rotation\":{\"degrees\":90}" +
+                "}";
+
+            mockMvc.perform(post("/api/images/{imageId}/edit", imageId)
+                    .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                    .content(payload)
+                    .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.width").value(4))
+                .andExpect(jsonPath("$.data.height").value(2))
+                .andExpect(jsonPath("$.data.thumbnails.length()")
+                    .value(thumbnailProperties.getPresets().size()));
+
+            Image editedImage = imageRepository.findWithUserAndThumbnailsById(imageId).orElseThrow();
+            assertThat(editedImage.getWidth()).isEqualTo(4);
+            assertThat(editedImage.getHeight()).isEqualTo(2);
+            assertThat(editedImage.getThumbnails()).hasSize(thumbnailProperties.getPresets().size());
+            editedImage.getThumbnails()
+                .forEach(thumbnail -> assertThat(Files.exists(Path.of(thumbnail.getFilePath()))).isTrue());
+            }
+
     @Test
     void editImage_shouldRejectMissingOperations() throws Exception {
         persistUser();
