@@ -41,6 +41,12 @@ app:
     secret: dev-jwt-secret-key-change-in-production
     expiration: 86400000
     refresh-expiration: 604800000
+  admin:
+    enabled: true
+    username: ${APP_ADMIN_USERNAME:admin}
+    email: ${APP_ADMIN_EMAIL:admin@example.com}
+    password: ${APP_ADMIN_PASSWORD:ChangeMe123!}
+    reset-password: ${APP_ADMIN_RESET_PASSWORD:false}
   cache:
     default-ttl: 5m
     users-ttl: 30m
@@ -95,6 +101,12 @@ app:
     secret: ${JWT_SECRET:docker-dev-secret-change-me}
     expiration: ${JWT_EXPIRATION:86400000}
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+  admin:
+    enabled: true
+    username: ${APP_ADMIN_USERNAME:admin}
+    email: ${APP_ADMIN_EMAIL:admin@example.com}
+    password: ${APP_ADMIN_PASSWORD:ChangeMe123!}
+    reset-password: ${APP_ADMIN_RESET_PASSWORD:false}
   file:
     upload-dir: /app/uploads
     max-size: 104857600
@@ -148,6 +160,12 @@ app:
     secret: ${JWT_SECRET}
     expiration: ${JWT_EXPIRATION:86400000}
     refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+  admin:
+    enabled: true
+    username: ${APP_ADMIN_USERNAME:admin}
+    email: ${APP_ADMIN_EMAIL:admin@example.com}
+    password: ${APP_ADMIN_PASSWORD:ChangeMe123!}
+    reset-password: ${APP_ADMIN_RESET_PASSWORD:false}
   cache:
     default-ttl: ${CACHE_DEFAULT_TTL:5m}
     users-ttl: ${CACHE_USERS_TTL:30m}

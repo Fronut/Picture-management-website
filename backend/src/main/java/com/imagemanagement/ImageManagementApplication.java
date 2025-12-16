@@ -1,5 +1,6 @@
 package com.imagemanagement;
 
+import com.imagemanagement.config.AdminUserProperties;
 import com.imagemanagement.config.AiServiceProperties;
 import com.imagemanagement.config.CacheProperties;
 import com.imagemanagement.config.FileStorageProperties;
@@ -12,7 +13,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 
 @SpringBootApplication
 @EnableAsync
-@EnableConfigurationProperties({JwtProperties.class, FileStorageProperties.class, ThumbnailProperties.class, CacheProperties.class, AiServiceProperties.class})
+@EnableConfigurationProperties({JwtProperties.class, FileStorageProperties.class, ThumbnailProperties.class, CacheProperties.class, AiServiceProperties.class, AdminUserProperties.class})
 public class ImageManagementApplication {
 
     public static void main(String[] args) {

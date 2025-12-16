@@ -19,6 +19,12 @@ app:
     secret: test-jwt-secret-key-test-jwt-secret-key
     expiration: 3600000
     refresh-expiration: 604800000
+  admin:
+    enabled: true
+    username: admin
+    email: admin@example.com
+    password: ChangeMe123!
+    reset-password: false
   cache:
     default-ttl: 5m
     users-ttl: 30m

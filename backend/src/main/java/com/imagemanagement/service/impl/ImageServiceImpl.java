@@ -14,6 +14,7 @@ import com.imagemanagement.entity.ImageTag;
 import com.imagemanagement.entity.Thumbnail;
 import com.imagemanagement.entity.User;
 import com.imagemanagement.entity.enums.ImagePrivacyLevel;
+import com.imagemanagement.entity.enums.UserRole;
 import com.imagemanagement.exception.BadRequestException;
 import com.imagemanagement.exception.ForbiddenException;
 import com.imagemanagement.exception.ResourceNotFoundException;
@@ -66,6 +67,8 @@ import org.springframework.web.multipart.MultipartFile;
 @Transactional
 public class ImageServiceImpl implements ImageService {
 
+    private static final int MAX_HIGHLIGHT_SIZE = 12;
+
     private final ImageRepository imageRepository;
     private final UserRepository userRepository;
     private final FileStorageService fileStorageService;
@@ -73,9 +76,9 @@ public class ImageServiceImpl implements ImageService {
     private final ThumbnailService thumbnailService;
     private final ThumbnailRepository thumbnailRepository;
     private final TagService tagService;
+
     @PersistenceContext
     private EntityManager entityManager;
-    private static final int MAX_HIGHLIGHT_SIZE = 12;
 
     public ImageServiceImpl(ImageRepository imageRepository,
             UserRepository userRepository,
@@ -151,9 +154,9 @@ public class ImageServiceImpl implements ImageService {
     }
 
     @Override
-        @Cacheable(cacheNames = CacheNames.IMAGE_SEARCH,
-            key = "T(com.imagemanagement.cache.CacheKeyGenerator).imageSearchKey(#userId, #request)")
-        public PageResponse<ImageSummaryResponse> searchImages(Long userId, ImageSearchRequest request) {
+    @Cacheable(cacheNames = CacheNames.IMAGE_SEARCH,
+        key = "T(com.imagemanagement.cache.CacheKeyGenerator).imageSearchKey(#userId, #request)")
+    public PageResponse<ImageSummaryResponse> searchImages(Long userId, ImageSearchRequest request) {
         ImageSearchRequest criteria = request != null ? request : new ImageSearchRequest();
         validateRange(criteria.getMinWidth(), criteria.getMaxWidth(), "width");
         validateRange(criteria.getMinHeight(), criteria.getMaxHeight(), "height");
@@ -162,8 +165,9 @@ public class ImageServiceImpl implements ImageService {
         Pageable pageable = PageRequest.of(criteria.getPage(), criteria.getSize(), sort);
         Specification<Image> specification = Objects.requireNonNull(ImageSpecifications.build(criteria, userId));
         Page<Image> images = imageRepository.findAll(specification, pageable);
+        boolean requesterIsAdmin = isAdmin(userId);
         return PageResponse.from(
-            images.map(image -> toSummaryResponse(image, isOwner(image, userId)))
+            images.map(image -> toSummaryResponse(image, isOwner(image, userId), requesterIsAdmin))
         );
     }
 
@@ -178,9 +182,10 @@ public class ImageServiceImpl implements ImageService {
         }
 
         Image image = imageRepository.findWithUserAndThumbnailsById(imageId)
-                .orElseThrow(() -> new ResourceNotFoundException("Image not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Image not found"));
+        boolean requesterIsAdmin = isAdmin(userId);
 
-        if (!Objects.equals(image.getUser().getId(), userId)) {
+        if (!Objects.equals(image.getUser().getId(), userId) && !requesterIsAdmin) {
             throw new ForbiddenException("You do not have permission to delete this image");
         }
 
@@ -203,9 +208,11 @@ public class ImageServiceImpl implements ImageService {
         }
 
         Image image = imageRepository.findWithUserAndThumbnailsById(imageId)
-                .orElseThrow(() -> new ResourceNotFoundException("Image not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Image not found"));
+        boolean requesterIsAdmin = isAdmin(userId);
+        boolean isOwner = isOwner(image, userId);
 
-        if (!Objects.equals(image.getUser().getId(), userId)) {
+        if (!isOwner && !requesterIsAdmin) {
             throw new ForbiddenException("You do not have permission to edit this image");
         }
 
@@ -230,7 +237,7 @@ public class ImageServiceImpl implements ImageService {
         entityManager.flush();
         entityManager.refresh(image);
 
-        return toSummaryResponse(image, true);
+        return toSummaryResponse(image, isOwner, requesterIsAdmin);
     }
 
     @Override
@@ -239,12 +246,17 @@ public class ImageServiceImpl implements ImageService {
             throw new BadRequestException("Size must be greater than zero");
         }
 
+        if (userId == null) {
+            return List.of();
+        }
+
+        boolean requesterIsAdmin = isAdmin(userId);
         int pageSize = Math.min(size, MAX_HIGHLIGHT_SIZE);
         Pageable pageable = PageRequest.of(0, pageSize, Sort.by(Sort.Direction.DESC, "uploadTime"));
         Page<Image> page = imageRepository.findByUser_IdOrderByUploadTimeDesc(userId, pageable);
         return page.getContent().stream()
-            .map(image -> toSummaryResponse(image, true))
-            .toList();
+                .map(image -> toSummaryResponse(image, isOwner(image, userId), requesterIsAdmin))
+                .toList();
     }
 
     @Override
@@ -254,24 +266,25 @@ public class ImageServiceImpl implements ImageService {
         }
         Image image = imageRepository.findWithDetailsById(imageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Image not found"));
-        boolean isOwner = requesterId != null && Objects.equals(image.getUser().getId(), requesterId);
-        enforceVisibility(image, isOwner);
-        return buildDetailResponse(image, isOwner);
+        boolean requesterIsAdmin = isAdmin(requesterId);
+        boolean isOwner = isOwner(image, requesterId);
+        enforceVisibility(image, isOwner, requesterIsAdmin);
+        return buildDetailResponse(image, isOwner, requesterIsAdmin);
     }
 
-    private void enforceVisibility(Image image, boolean isOwner) {
-        if (image.getPrivacyLevel() == ImagePrivacyLevel.PRIVATE && !isOwner) {
+    private void enforceVisibility(Image image, boolean isOwner, boolean isAdmin) {
+        if (image.getPrivacyLevel() == ImagePrivacyLevel.PRIVATE && !isOwner && !isAdmin) {
             throw new ForbiddenException("You do not have permission to view this image");
         }
     }
 
-    private ImageDetailResponse buildDetailResponse(Image image, boolean isOwner) {
+    private ImageDetailResponse buildDetailResponse(Image image, boolean isOwner, boolean isAdmin) {
         ImageDetailResponse response = new ImageDetailResponse();
-        response.setSummary(toSummaryResponse(image, isOwner));
+        response.setSummary(toSummaryResponse(image, isOwner, isAdmin));
         response.setOwner(buildOwnerSummary(image.getUser()));
         response.setExif(buildExifDetails(image.getExifData()));
         response.setTagDetails(buildTagDetails(image.getImageTags()));
-        response.setAccess(buildAccessInfo(image, isOwner));
+        response.setAccess(buildAccessInfo(image, isOwner, isAdmin));
         return response;
     }
 
@@ -323,22 +336,24 @@ public class ImageServiceImpl implements ImageService {
                 .toList();
     }
 
-    private ImageDetailResponse.AccessInfo buildAccessInfo(Image image, boolean isOwner) {
+    private ImageDetailResponse.AccessInfo buildAccessInfo(Image image, boolean isOwner, boolean isAdmin) {
         ImageDetailResponse.AccessInfo accessInfo = new ImageDetailResponse.AccessInfo();
-        accessInfo.setCanEdit(isOwner);
-        accessInfo.setCanDelete(isOwner);
-        accessInfo.setCanDownloadOriginal(isOwner || image.getPrivacyLevel() == ImagePrivacyLevel.PUBLIC);
-        accessInfo.setCanManageTags(isOwner);
+        boolean privileged = isOwner || isAdmin;
+        accessInfo.setCanEdit(privileged);
+        accessInfo.setCanDelete(privileged);
+        accessInfo.setCanDownloadOriginal(privileged || image.getPrivacyLevel() == ImagePrivacyLevel.PUBLIC);
+        accessInfo.setCanManageTags(privileged);
         return accessInfo;
     }
-
-    private ImageSummaryResponse.AccessInfo buildSummaryAccessInfo(Image image, boolean isOwner) {
+ 
+    private ImageSummaryResponse.AccessInfo buildSummaryAccessInfo(Image image, boolean isOwner, boolean isAdmin) {
         ImageSummaryResponse.AccessInfo accessInfo = new ImageSummaryResponse.AccessInfo();
-        accessInfo.setCanEdit(isOwner);
-        accessInfo.setCanDelete(isOwner);
-        accessInfo.setCanManageTags(isOwner);
+        boolean privileged = isOwner || isAdmin;
+        accessInfo.setCanEdit(privileged);
+        accessInfo.setCanDelete(privileged);
+        accessInfo.setCanManageTags(privileged);
         accessInfo.setCanDownloadOriginal(
-                isOwner || image.getPrivacyLevel() == ImagePrivacyLevel.PUBLIC
+                privileged || image.getPrivacyLevel() == ImagePrivacyLevel.PUBLIC
         );
         return accessInfo;
     }
@@ -420,10 +435,10 @@ public class ImageServiceImpl implements ImageService {
     }
 
     private ImageSummaryResponse toSummaryResponse(Image image) {
-        return toSummaryResponse(image, false);
+        return toSummaryResponse(image, false, false);
     }
 
-    private ImageSummaryResponse toSummaryResponse(Image image, boolean isOwner) {
+    private ImageSummaryResponse toSummaryResponse(Image image, boolean isOwner, boolean isAdmin) {
         ImageSummaryResponse response = new ImageSummaryResponse();
         response.setId(image.getId());
         response.setOriginalFilename(image.getOriginalFilename());
@@ -445,7 +460,7 @@ public class ImageServiceImpl implements ImageService {
 
         response.setTags(extractTagNames(image.getImageTags()));
         response.setThumbnails(extractThumbnailSummaries(image));
-        response.setAccess(buildSummaryAccessInfo(image, isOwner));
+        response.setAccess(buildSummaryAccessInfo(image, isOwner, isAdmin));
         return response;
     }
 
