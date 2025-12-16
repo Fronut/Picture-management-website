@@ -124,6 +124,7 @@ export interface ImageAccessInfo {
   canEdit: boolean;
   canDelete: boolean;
   canDownloadOriginal: boolean;
+  canManageTags: boolean;
 }
 
 export interface ImageDetail {

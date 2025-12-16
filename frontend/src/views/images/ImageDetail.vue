@@ -45,7 +45,13 @@
             <el-button v-if="detail.access.canEdit" @click="openEditDialog">
               编辑图片
             </el-button>
-            <el-button text @click="openTagManager">管理标签</el-button>
+            <el-button
+              v-if="detail.access.canManageTags"
+              text
+              @click="openTagManager"
+            >
+              管理标签
+            </el-button>
           </div>
         </div>
         <div class="hero-preview" :class="{ loading: previewLoading }">
@@ -150,7 +156,19 @@
       <el-row :gutter="24" class="info-grid">
         <el-col :xs="24" :md="12">
           <el-card shadow="never">
-            <template #header>标签详情</template>
+            <template #header>
+              <div class="card-header">
+                <span>标签详情</span>
+                <el-button
+                  v-if="detail.access.canManageTags"
+                  text
+                  size="small"
+                  @click="openTagManager"
+                >
+                  管理标签
+                </el-button>
+              </div>
+            </template>
             <div v-if="detail.tagDetails.length" class="tag-grid">
               <div
                 v-for="tag in detail.tagDetails"
@@ -203,6 +221,12 @@
       :image="detail?.summary ?? null"
       @edited="handleEditApplied"
     />
+
+    <ImageTagManagerPanel
+      v-model="tagManagerVisible"
+      :image-id="summary?.id ?? null"
+      @updated="handleTagsUpdated"
+    />
   </section>
 </template>
 
@@ -212,6 +236,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import ImageEditDialog from "@/components/ImageEditDialog.vue";
+import ImageTagManagerPanel from "@/components/ImageTagManagerPanel.vue";
 import {
   downloadOriginalImage,
   downloadThumbnail,
@@ -219,6 +244,7 @@ import {
 } from "@/services/imageService";
 import type { ImageDetail, ImageSearchResult } from "@/types/image";
 import type { ImageSummaryThumbnail } from "@/types/image";
+import type { ImageTag } from "@/types/tag";
 
 const route = useRoute();
 const router = useRouter();
@@ -230,6 +256,7 @@ const previewUrl = ref<string | null>(null);
 const previewLoading = ref(false);
 const downloading = ref(false);
 const editDialogVisible = ref(false);
+const tagManagerVisible = ref(false);
 
 const summary = computed(() => detail.value?.summary ?? null);
 
@@ -398,11 +425,22 @@ const handleEditApplied = (updated: ImageSearchResult) => {
 };
 
 const openTagManager = () => {
-  if (!detail.value?.summary) return;
-  router.push({
-    name: "image-tags",
-    params: { imageId: detail.value.summary.id },
-  });
+  if (!detail.value?.summary || !detail.value.access.canManageTags) {
+    return;
+  }
+  tagManagerVisible.value = true;
+};
+
+const handleTagsUpdated = (updatedTags: ImageTag[]) => {
+  if (!detail.value) return;
+  detail.value = {
+    ...detail.value,
+    tagDetails: updatedTags,
+    summary: {
+      ...detail.value.summary,
+      tags: updatedTags.map((tag) => tag.tagName),
+    },
+  };
 };
 
 const handleBack = () => {
@@ -412,6 +450,7 @@ const handleBack = () => {
 watch(
   () => route.params.imageId,
   () => {
+    tagManagerVisible.value = false;
     void fetchDetail();
   },
   { immediate: true }

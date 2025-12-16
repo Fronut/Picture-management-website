@@ -241,13 +241,6 @@
                         >
                           删除
                         </el-button>
-                        <el-button
-                          text
-                          size="small"
-                          @click="goToTagManager(image.id)"
-                        >
-                          管理标签
-                        </el-button>
                       </el-space>
                       <el-tag
                         size="small"
@@ -672,10 +665,6 @@ const thumbnailUrl = (image: ImageSearchResult) => {
 
 const goToDetail = (imageId: number) => {
   router.push({ name: "image-detail", params: { imageId } });
-};
-
-const goToTagManager = (imageId: number) => {
-  router.push({ name: "image-tags", params: { imageId } });
 };
 
 const goAiChat = () => {

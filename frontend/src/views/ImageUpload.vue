@@ -1,19 +1,10 @@
-<template>
-  <section class="upload-page">
-    <el-row :gutter="24">
-      <el-col :xs="24" :lg="16">
-        <el-card shadow="never" class="upload-card">
-          <template #header>
-            <div class="card-header">
-              <div>
-                <h2>图片上传</h2>
-                <p>选择图片、设置隐私与描述，点击上传即可。</p>
-              </div>
-              <el-tag type="info"> 最大 20MB/张 (后端限制) </el-tag>
-            </div>
-          </template>
-
-          <el-upload
+                  <el-button
+                    text
+                    size="small"
+                    @click="goToDetail(image.id)"
+                  >
+                    查看详情
+                  </el-button>
             ref="uploadRef"
             drag
             action=""
@@ -244,10 +235,6 @@ const handleUpload = () => {
 
 const goToDetail = (imageId: number) => {
   router.push({ name: "image-detail", params: { imageId } });
-};
-
-const goToTagManager = (imageId: number) => {
-  router.push({ name: "image-tags", params: { imageId } });
 };
 
 const formatBytes = (size: number) => {

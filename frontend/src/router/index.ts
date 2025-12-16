@@ -41,12 +41,6 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: "/images/:imageId/tags",
-      name: "image-tags",
-      component: () => import("@/views/ImageTagManager.vue"),
-      meta: { requiresAuth: true },
-    },
-    {
       path: "/auth/login",
       name: "login",
       component: () => import("@/views/AuthLogin.vue"),
