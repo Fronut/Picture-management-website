@@ -4,9 +4,11 @@ import com.imagemanagement.cache.CacheNames;
 import com.imagemanagement.dto.request.ImageEditRequest;
 import com.imagemanagement.dto.request.ImageSearchRequest;
 import com.imagemanagement.dto.response.ImageDeleteResponse;
+import com.imagemanagement.dto.response.ImageDetailResponse;
 import com.imagemanagement.dto.response.ImageSummaryResponse;
 import com.imagemanagement.dto.response.ImageUploadResponse;
 import com.imagemanagement.dto.response.PageResponse;
+import com.imagemanagement.entity.ExifData;
 import com.imagemanagement.entity.Image;
 import com.imagemanagement.entity.ImageTag;
 import com.imagemanagement.entity.Thumbnail;
@@ -241,6 +243,90 @@ public class ImageServiceImpl implements ImageService {
         return page.getContent().stream()
                 .map(this::toSummaryResponse)
                 .toList();
+    }
+
+    @Override
+    public ImageDetailResponse getImageDetail(Long requesterId, Long imageId) {
+        if (imageId == null) {
+            throw new BadRequestException("Image id is required");
+        }
+        Image image = imageRepository.findWithDetailsById(imageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Image not found"));
+        boolean isOwner = requesterId != null && Objects.equals(image.getUser().getId(), requesterId);
+        enforceVisibility(image, isOwner);
+        return buildDetailResponse(image, isOwner);
+    }
+
+    private void enforceVisibility(Image image, boolean isOwner) {
+        if (image.getPrivacyLevel() == ImagePrivacyLevel.PRIVATE && !isOwner) {
+            throw new ForbiddenException("You do not have permission to view this image");
+        }
+    }
+
+    private ImageDetailResponse buildDetailResponse(Image image, boolean isOwner) {
+        ImageDetailResponse response = new ImageDetailResponse();
+        response.setSummary(toSummaryResponse(image));
+        response.setOwner(buildOwnerSummary(image.getUser()));
+        response.setExif(buildExifDetails(image.getExifData()));
+        response.setTagDetails(buildTagDetails(image.getImageTags()));
+        response.setAccess(buildAccessInfo(image, isOwner));
+        return response;
+    }
+
+    private ImageDetailResponse.OwnerSummary buildOwnerSummary(User user) {
+        ImageDetailResponse.OwnerSummary owner = new ImageDetailResponse.OwnerSummary();
+        owner.setId(user.getId());
+        owner.setUsername(user.getUsername());
+        owner.setEmail(user.getEmail());
+        owner.setAvatarUrl(user.getAvatarUrl());
+        return owner;
+    }
+
+    private ImageDetailResponse.ExifDetails buildExifDetails(ExifData exifData) {
+        if (exifData == null) {
+            return null;
+        }
+        ImageDetailResponse.ExifDetails details = new ImageDetailResponse.ExifDetails();
+        details.setCameraMake(exifData.getCameraMake());
+        details.setCameraModel(exifData.getCameraModel());
+        details.setExposureTime(exifData.getExposureTime());
+        details.setFNumber(exifData.getFNumber());
+        details.setIsoSpeed(exifData.getIsoSpeed());
+        details.setFocalLength(exifData.getFocalLength());
+        details.setLatitude(exifData.getLatitude());
+        details.setLongitude(exifData.getLongitude());
+        details.setLocationName(exifData.getLocationName());
+        details.setTakenTime(exifData.getTakenTime());
+        return details;
+    }
+
+    private List<ImageDetailResponse.TagDetail> buildTagDetails(Set<ImageTag> imageTags) {
+        if (CollectionUtils.isEmpty(imageTags)) {
+            return List.of();
+        }
+        return imageTags.stream()
+                .filter(tag -> tag.getTag() != null)
+                .map(tag -> {
+                    ImageDetailResponse.TagDetail detail = new ImageDetailResponse.TagDetail();
+                    detail.setTagId(tag.getTag().getId());
+                    detail.setTagName(tag.getTag().getTagName());
+                    detail.setTagType(tag.getTag().getTagType());
+                    detail.setUsageCount(tag.getTag().getUsageCount());
+                    detail.setConfidence(tag.getConfidence());
+                    return detail;
+                })
+                .sorted(Comparator.comparing(
+                        ImageDetailResponse.TagDetail::getTagName,
+                        Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .toList();
+    }
+
+    private ImageDetailResponse.AccessInfo buildAccessInfo(Image image, boolean isOwner) {
+        ImageDetailResponse.AccessInfo accessInfo = new ImageDetailResponse.AccessInfo();
+        accessInfo.setCanEdit(isOwner);
+        accessInfo.setCanDelete(isOwner);
+        accessInfo.setCanDownloadOriginal(isOwner || image.getPrivacyLevel() == ImagePrivacyLevel.PUBLIC);
+        return accessInfo;
     }
 
     private Image buildImageEntity(User user, FileStorageService.StoredFileInfo storedFile,

@@ -4,6 +4,7 @@ import com.imagemanagement.dto.request.ImageEditRequest;
 import com.imagemanagement.dto.request.ImageSearchRequest;
 import com.imagemanagement.dto.response.ApiResponse;
 import com.imagemanagement.dto.response.ImageDeleteResponse;
+import com.imagemanagement.dto.response.ImageDetailResponse;
 import com.imagemanagement.dto.response.ImageSummaryResponse;
 import com.imagemanagement.dto.response.ImageUploadResponse;
 import com.imagemanagement.dto.response.PageResponse;
@@ -85,6 +86,15 @@ public class ImageController {
         Long userId = resolveUserId(authentication);
         List<ImageSummaryResponse> highlights = imageService.getHighlightImages(userId, size);
         return ResponseEntity.ok(ApiResponse.success(highlights));
+    }
+
+    @GetMapping("/{imageId}")
+    public ResponseEntity<ApiResponse<ImageDetailResponse>> getImageDetail(
+            @PathVariable Long imageId,
+            Authentication authentication) {
+        Long userId = resolveUserId(authentication);
+        ImageDetailResponse detail = imageService.getImageDetail(userId, imageId);
+        return ResponseEntity.ok(ApiResponse.success(detail));
     }
 
     private Long resolveUserId(Authentication authentication) {

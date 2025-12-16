@@ -3,6 +3,7 @@ package com.imagemanagement.service;
 import com.imagemanagement.dto.request.ImageEditRequest;
 import com.imagemanagement.dto.request.ImageSearchRequest;
 import com.imagemanagement.dto.response.ImageDeleteResponse;
+import com.imagemanagement.dto.response.ImageDetailResponse;
 import com.imagemanagement.dto.response.ImageSummaryResponse;
 import com.imagemanagement.dto.response.ImageUploadResponse;
 import com.imagemanagement.dto.response.PageResponse;
@@ -21,4 +22,6 @@ public interface ImageService {
     ImageSummaryResponse editImage(Long userId, Long imageId, ImageEditRequest request);
 
     List<ImageSummaryResponse> getHighlightImages(Long userId, int size);
+
+    ImageDetailResponse getImageDetail(Long requesterId, Long imageId);
 }

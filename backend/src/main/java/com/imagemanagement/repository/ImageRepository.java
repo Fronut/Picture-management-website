@@ -13,6 +13,9 @@ public interface ImageRepository extends JpaRepository<Image, Long>, JpaSpecific
 	@EntityGraph(attributePaths = {"user", "thumbnails"})
 	Optional<Image> findWithUserAndThumbnailsById(Long id);
 
+	@EntityGraph(attributePaths = {"user", "thumbnails", "exifData", "imageTags", "imageTags.tag"})
+	Optional<Image> findWithDetailsById(Long id);
+
 	boolean existsByUser_IdAndContentHash(Long userId, String contentHash);
 
 	Page<Image> findByUser_IdOrderByUploadTimeDesc(Long userId, Pageable pageable);
