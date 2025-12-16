@@ -1,6 +1,7 @@
 package com.imagemanagement.repository;
 
 import com.imagemanagement.entity.User;
+import com.imagemanagement.entity.enums.UserRole;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -17,4 +18,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmailIgnoreCase(String email);
 
     Optional<User> findByUsernameIgnoreCaseOrEmailIgnoreCase(String username, String email);
+
+    boolean existsByIdAndRole(Long id, UserRole role);
 }

@@ -365,6 +365,10 @@ public class ImageServiceImpl implements ImageService {
                 && Objects.equals(image.getUser().getId(), userId);
     }
 
+    private boolean isAdmin(Long userId) {
+        return userId != null && userRepository.existsByIdAndRole(userId, UserRole.ADMIN);
+    }
+
     private Image buildImageEntity(User user, FileStorageService.StoredFileInfo storedFile,
                                    ImagePrivacyLevel privacyLevel, String description, String contentHash) {
         Image image = new Image();

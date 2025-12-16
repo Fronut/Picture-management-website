@@ -53,7 +53,7 @@ public class SecurityConfig {
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     .requestMatchers("/api/ai/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/images/search").permitAll()
-                    .requestMatchers(HttpMethod.GET, "/api/tags/available", "/api/images/highlights", "/api/images/*/thumbnail").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/api/tags/available", "/api/images/highlights", "/api/images/*/thumbnails/*", "/api/images/*/content").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

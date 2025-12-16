@@ -3,9 +3,11 @@ package com.imagemanagement.service;
 import com.imagemanagement.entity.Image;
 import com.imagemanagement.entity.Thumbnail;
 import com.imagemanagement.entity.enums.ImagePrivacyLevel;
+import com.imagemanagement.entity.enums.UserRole;
 import com.imagemanagement.exception.ForbiddenException;
 import com.imagemanagement.exception.ResourceNotFoundException;
 import com.imagemanagement.repository.ImageRepository;
+import com.imagemanagement.repository.UserRepository;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,9 +25,11 @@ import org.springframework.util.StringUtils;
 public class ImageContentService {
 
     private final ImageRepository imageRepository;
+    private final UserRepository userRepository;
 
-    public ImageContentService(ImageRepository imageRepository) {
+    public ImageContentService(ImageRepository imageRepository, UserRepository userRepository) {
         this.imageRepository = imageRepository;
+        this.userRepository = userRepository;
     }
 
     public ContentResource loadOriginal(Long imageId, Long requesterId) {
@@ -51,10 +55,20 @@ public class ImageContentService {
     }
 
     private void ensureAccess(Image image, Long requesterId) {
-        if (image.getPrivacyLevel() == ImagePrivacyLevel.PRIVATE
-                && !Objects.equals(image.getUser().getId(), requesterId)) {
-            throw new ForbiddenException("You do not have permission to view this image");
+        if (image.getPrivacyLevel() != ImagePrivacyLevel.PRIVATE) {
+            return;
         }
+        if (Objects.equals(image.getUser().getId(), requesterId)) {
+            return;
+        }
+        if (isAdmin(requesterId)) {
+            return;
+        }
+        throw new ForbiddenException("You do not have permission to view this image");
+    }
+
+    private boolean isAdmin(Long requesterId) {
+        return requesterId != null && userRepository.existsByIdAndRole(requesterId, UserRole.ADMIN);
     }
 
     private ContentResource toContentResource(Path path, MediaType mediaType) {
