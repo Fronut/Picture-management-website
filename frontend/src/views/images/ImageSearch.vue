@@ -226,7 +226,7 @@
                           查看详情
                         </el-button>
                         <el-button
-                          v-if="image.access.canEdit"
+                          v-if="canEditImage(image)"
                           text
                           size="small"
                           @click="openEditDialog(image)"
@@ -234,7 +234,7 @@
                           编辑
                         </el-button>
                         <el-button
-                          v-if="image.access.canDelete"
+                          v-if="canDeleteImage(image)"
                           text
                           type="danger"
                           size="small"
@@ -303,6 +303,7 @@ import { useImageUploadStore } from "@/stores/imageUpload";
 import ImageEditDialog from "@/components/ImageEditDialog.vue";
 import { chatSearchImages } from "@/services/aiService";
 import type {
+  ImageAccessInfo,
   ImageSearchResult,
   ImageSearchPayload,
   ImageSearchPrivacy,
@@ -351,6 +352,19 @@ const originalLoads = new Set<number>();
 const allocatedUrls = new Set<string>();
 const transparentPixel =
   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+const emptyAccess: ImageAccessInfo = {
+  canEdit: false,
+  canDelete: false,
+  canManageTags: false,
+  canDownloadOriginal: false,
+};
+
+const getAccessInfo = (image?: ImageSearchResult | null) =>
+  image?.access ?? emptyAccess;
+const canEditImage = (image: ImageSearchResult | null) =>
+  getAccessInfo(image).canEdit;
+const canDeleteImage = (image: ImageSearchResult | null) =>
+  getAccessInfo(image).canDelete;
 
 const dateShortcuts = [
   {
@@ -674,7 +688,7 @@ const goAiChat = () => {
 };
 
 const openEditDialog = (image: ImageSearchResult) => {
-  if (!image.access.canEdit) {
+  if (!canEditImage(image)) {
     ElMessage.warning("您没有权限编辑此图片");
     return;
   }
@@ -689,7 +703,7 @@ const handleEditApplied = (updated: ImageSearchResult) => {
 };
 
 const handleDeleteImage = async (image: ImageSearchResult) => {
-  if (!image.access.canDelete) {
+  if (!canDeleteImage(image)) {
     ElMessage.warning("您没有权限删除此图片");
     return;
   }
