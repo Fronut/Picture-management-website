@@ -36,11 +36,20 @@ const defaultFilters: ImageSearchPayload = {
   sortDirection: "DESC",
 };
 
+const PAGE_SIZE_OPTIONS = [10, 20, 40, 60];
+const DEFAULT_PAGE_SIZE = defaultFilters.size ?? PAGE_SIZE_OPTIONS[0];
+const pickPageSize = (preferred?: number): number => {
+  if (typeof preferred === "number" && PAGE_SIZE_OPTIONS.includes(preferred)) {
+    return preferred;
+  }
+  return DEFAULT_PAGE_SIZE;
+};
+
 const defaultState = (): ImageSearchState => ({
   results: [],
   pagination: {
     pageNumber: 0,
-    pageSize: 20,
+    pageSize: DEFAULT_PAGE_SIZE,
     totalElements: 0,
     totalPages: 0,
     first: true,
@@ -145,16 +154,17 @@ export const useImageSearchStore = defineStore("imageSearch", {
 
     hydrateFromPage(page: PageResponse<ImageSearchResult>) {
       this.results = page.content;
+      const hydratedPageSize = pickPageSize(this.filters.size);
       this.pagination = {
         pageNumber: page.pageNumber,
-        pageSize: page.pageSize,
+        pageSize: hydratedPageSize,
         totalElements: page.totalElements,
         totalPages: page.totalPages,
         first: page.first,
         last: page.last,
       };
       this.filters.page = page.pageNumber;
-      this.filters.size = page.pageSize;
+      this.filters.size = hydratedPageSize;
     },
   },
 });
