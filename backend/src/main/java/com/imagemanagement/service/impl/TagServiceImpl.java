@@ -259,8 +259,8 @@ public class TagServiceImpl implements TagService {
         }
 
         List<TagCandidate> candidates = rawCandidates.stream()
-                .filter(candidate -> StringUtils.hasText(candidate.tagName()))
-                .map(candidate -> new TagCandidate(normalizeTagName(candidate.tagName()), candidate.tagType(), candidate.confidence()))
+            .filter(candidate -> StringUtils.hasText(candidate.tagName()))
+            .map(candidate -> new TagCandidate(normalizeTagName(candidate.tagName()), candidate.tagType(), candidate.confidence()))
                 .filter(candidate -> StringUtils.hasText(candidate.tagName()))
                 .collect(Collectors.collectingAndThen(Collectors.toMap(
                         candidate -> candidate.tagName().toLowerCase(Locale.ROOT),
@@ -291,6 +291,12 @@ public class TagServiceImpl implements TagService {
     }
 
     private TagCandidate preferHigherConfidence(TagCandidate left, TagCandidate right) {
+        if (left.tagType() == TagType.CUSTOM && right.tagType() == TagType.CUSTOM) {
+            if (left.confidence().compareTo(right.confidence()) >= 0) {
+                return left;
+            }
+            return new TagCandidate(left.tagName(), left.tagType(), right.confidence());
+        }
         return left.confidence().compareTo(right.confidence()) >= 0 ? left : right;
     }
 
