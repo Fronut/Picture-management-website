@@ -18,6 +18,7 @@
           </p>
           <small class="user-email">{{ user?.email }}</small>
         </div>
+        <el-button plain @click="navigateTo('/dashboard')">首页</el-button>
         <el-button type="success" plain @click="navigateTo('/images/upload')">
           上传图片
         </el-button>

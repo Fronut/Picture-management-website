@@ -20,6 +20,13 @@
           >
             刷新精选
           </el-button>
+          <el-button
+            plain
+            :disabled="!highlightPool.length || highlightsLoading"
+            @click="openManageDialog"
+          >
+            管理展示
+          </el-button>
         </div>
       </div>
       <div class="hero-visual">
@@ -30,14 +37,17 @@
             </template>
           </el-skeleton>
         </div>
-        <div v-else-if="highlights.length" class="carousel-wrapper">
+        <div v-else-if="visibleHighlights.length" class="carousel-wrapper">
           <el-carousel
             :interval="5500"
             height="280px"
             trigger="click"
             indicator-position="outside"
           >
-            <el-carousel-item v-for="image in highlights" :key="image.id">
+            <el-carousel-item
+              v-for="image in visibleHighlights"
+              :key="image.id"
+            >
               <div class="carousel-slide" :style="backgroundStyle(image)">
                 <div class="slide-overlay">
                   <span class="slide-filename">{{
@@ -89,13 +99,65 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <el-dialog
+      v-model="manageDialogVisible"
+      title="管理精选展示"
+      width="720px"
+      destroy-on-close
+    >
+      <p class="selection-tip">
+        选择希望在轮播中展示的图片，最多
+        {{ MAX_MANUAL_SELECTION }} 张。不保存即表示恢复为自动推荐。
+      </p>
+      <div class="selection-toolbar">
+        <el-input
+          v-model="selectionFilter"
+          placeholder="按文件名快速过滤"
+          clearable
+        />
+        <el-button
+          text
+          @click="resetSelection"
+          :disabled="!manualHighlightIds.length"
+        >
+          恢复自动展示
+        </el-button>
+      </div>
+      <el-checkbox-group v-model="selectionDraft" class="selection-grid">
+        <el-checkbox
+          v-for="image in filteredSelectionCandidates"
+          :key="image.id"
+          :label="image.id"
+          class="selection-item"
+        >
+          <div class="selection-thumb" :style="backgroundStyle(image)">
+            <span class="selection-name">{{ image.originalFilename }}</span>
+            <small class="selection-meta">{{ formatResolution(image) }}</small>
+          </div>
+        </el-checkbox>
+      </el-checkbox-group>
+      <template #footer>
+        <div class="dialog-footer">
+          <span class="selection-count">
+            已选 {{ selectionDraft.length }} / {{ MAX_MANUAL_SELECTION }}
+          </span>
+          <div class="footer-actions">
+            <el-button @click="manageDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="applySelection">
+              保存展示
+            </el-button>
+          </div>
+        </div>
+      </template>
+    </el-dialog>
   </section>
 </template>
 
 <script setup lang="ts">
 import { ElMessage } from "element-plus";
 import { storeToRefs } from "pinia";
-import { onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
 import {
@@ -112,11 +174,39 @@ const router = useRouter();
 
 type HighlightItem = ImageSearchResult & { previewUrl?: string };
 
-const highlights = ref<HighlightItem[]>([]);
+const HIGHLIGHT_SELECTION_KEY = "pm.dashboard.highlightSelection";
+const MAX_MANUAL_SELECTION = 8;
+const HIGHLIGHT_FETCH_SIZE = 16;
+
+const highlightPool = ref<HighlightItem[]>([]);
 const highlightsLoading = ref(false);
+const manualHighlightIds = ref<number[]>(loadStoredSelection());
+const manageDialogVisible = ref(false);
+const selectionDraft = ref<number[]>([]);
+const selectionFilter = ref("");
+
+const visibleHighlights = computed(() => {
+  if (!manualHighlightIds.value.length) {
+    return highlightPool.value;
+  }
+  const map = new Map(highlightPool.value.map((item) => [item.id, item]));
+  return manualHighlightIds.value
+    .map((id) => map.get(id))
+    .filter((item): item is HighlightItem => Boolean(item));
+});
+
+const filteredSelectionCandidates = computed(() => {
+  const keyword = selectionFilter.value.trim().toLowerCase();
+  if (!keyword) {
+    return highlightPool.value;
+  }
+  return highlightPool.value.filter((item) =>
+    item.originalFilename?.toLowerCase().includes(keyword)
+  );
+});
 
 const revokePreviewUrls = () => {
-  highlights.value.forEach((item) => {
+  highlightPool.value.forEach((item) => {
     if (item.previewUrl) {
       URL.revokeObjectURL(item.previewUrl);
     }
@@ -143,14 +233,15 @@ const resolvePreviewUrl = async (image: ImageSearchResult) => {
 const loadHighlights = async () => {
   highlightsLoading.value = true;
   try {
-    const raw = await fetchHighlightImages(8);
+    const raw = await fetchHighlightImages(HIGHLIGHT_FETCH_SIZE);
     revokePreviewUrls();
-    highlights.value = await Promise.all(
+    highlightPool.value = await Promise.all(
       raw.map(async (item) => ({
         ...item,
         previewUrl: await resolvePreviewUrl(item),
       }))
     );
+    syncManualSelection();
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "获取精选图片失败，请稍后再试";
@@ -188,6 +279,85 @@ const formatResolution = (image: ImageSearchResult) => {
   }
   return image.mimeType || "未知尺寸";
 };
+
+function loadStoredSelection(): number[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const raw = window.localStorage.getItem(HIGHLIGHT_SELECTION_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((id) => Number.isInteger(id));
+    }
+    return [];
+  } catch (error) {
+    console.warn("Failed to load highlight selection", error);
+    return [];
+  }
+}
+
+const persistManualSelection = () => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  if (manualHighlightIds.value.length) {
+    window.localStorage.setItem(
+      HIGHLIGHT_SELECTION_KEY,
+      JSON.stringify(manualHighlightIds.value)
+    );
+  } else {
+    window.localStorage.removeItem(HIGHLIGHT_SELECTION_KEY);
+  }
+};
+
+const openManageDialog = () => {
+  selectionDraft.value = manualHighlightIds.value.length
+    ? [...manualHighlightIds.value]
+    : highlightPool.value.map((item) => item.id);
+  selectionFilter.value = "";
+  manageDialogVisible.value = true;
+};
+
+const applySelection = () => {
+  if (selectionDraft.value.length > MAX_MANUAL_SELECTION) {
+    ElMessage.warning(`最多只能选择 ${MAX_MANUAL_SELECTION} 张图片`);
+    return;
+  }
+
+  if (!selectionDraft.value.length) {
+    manualHighlightIds.value = [];
+  } else {
+    manualHighlightIds.value = Array.from(new Set(selectionDraft.value));
+  }
+  persistManualSelection();
+  manageDialogVisible.value = false;
+};
+
+const resetSelection = () => {
+  manualHighlightIds.value = [];
+  selectionDraft.value = [];
+  persistManualSelection();
+};
+
+const syncManualSelection = () => {
+  if (!manualHighlightIds.value.length) {
+    return;
+  }
+  const availableIds = new Set(highlightPool.value.map((item) => item.id));
+  const filtered = manualHighlightIds.value.filter((id) =>
+    availableIds.has(id)
+  );
+  if (filtered.length !== manualHighlightIds.value.length) {
+    manualHighlightIds.value = filtered;
+    persistManualSelection();
+  }
+};
+
+watch(highlightPool, syncManualSelection);
 </script>
 
 <style scoped>
@@ -325,5 +495,75 @@ const formatResolution = (image: ImageSearchResult) => {
   .hero-copy h1 {
     font-size: 1.6rem;
   }
+}
+
+.selection-tip {
+  margin: 0 0 12px;
+  color: #4a5568;
+}
+
+.selection-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.selection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.selection-item {
+  width: 100%;
+}
+
+.selection-item :deep(.el-checkbox__label) {
+  width: 100%;
+  padding: 0;
+}
+
+.selection-thumb {
+  position: relative;
+  height: 120px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  background-size: cover;
+  background-position: center;
+  padding: 12px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  backdrop-filter: blur(3px);
+}
+
+.selection-name {
+  font-weight: 600;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.selection-meta {
+  opacity: 0.85;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.selection-count {
+  color: #4a5568;
+}
+
+.footer-actions {
+  display: flex;
+  gap: 12px;
 }
 </style>
