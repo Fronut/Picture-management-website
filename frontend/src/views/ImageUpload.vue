@@ -163,13 +163,18 @@
                   <small class="file-meta">
                     {{ formatBytes(image.fileSize) }} · {{ image.mimeType }}
                   </small>
-                  <el-button
-                    text
-                    size="small"
-                    @click="goToTagManager(image.id)"
-                  >
-                    管理标签
-                  </el-button>
+                  <el-space>
+                    <el-button text size="small" @click="goToDetail(image.id)">
+                      查看详情
+                    </el-button>
+                    <el-button
+                      text
+                      size="small"
+                      @click="goToTagManager(image.id)"
+                    >
+                      管理标签
+                    </el-button>
+                  </el-space>
                 </div>
               </el-timeline-item>
             </el-timeline>
@@ -235,6 +240,10 @@ const handleClearAll = () => {
 
 const handleUpload = () => {
   uploadStore.upload();
+};
+
+const goToDetail = (imageId: number) => {
+  router.push({ name: "image-detail", params: { imageId } });
 };
 
 const goToTagManager = (imageId: number) => {

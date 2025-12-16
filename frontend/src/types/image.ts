@@ -1,3 +1,5 @@
+import type { ImageTag } from "./tag";
+
 export type ImagePrivacyLevel = "PUBLIC" | "PRIVATE";
 
 // For search payloads we allow an explicit 'ALL' token to represent no filtering
@@ -96,6 +98,40 @@ export interface ImageSearchResult {
 export interface ImageDeleteResult {
   deletedImageId: number;
   deleteTime: string;
+}
+
+export interface ImageOwnerSummary {
+  id: number;
+  username: string;
+  email: string;
+  avatarUrl?: string | null;
+}
+
+export interface ImageExifDetail {
+  cameraMake?: string | null;
+  cameraModel?: string | null;
+  exposureTime?: string | null;
+  fNumber?: string | null;
+  isoSpeed?: number | null;
+  focalLength?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  locationName?: string | null;
+  takenTime?: string | null;
+}
+
+export interface ImageAccessInfo {
+  canEdit: boolean;
+  canDelete: boolean;
+  canDownloadOriginal: boolean;
+}
+
+export interface ImageDetail {
+  summary: ImageSearchResult;
+  owner: ImageOwnerSummary;
+  exif: ImageExifDetail | null;
+  tagDetails: ImageTag[];
+  access: ImageAccessInfo;
 }
 
 export interface UploadCandidate {

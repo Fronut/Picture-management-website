@@ -212,6 +212,11 @@
                     {{ formatBytes(image.fileSize) }} ·
                     {{ formatDate(image.uploadTime) }}
                   </p>
+                  <div class="match-actions">
+                    <el-button text size="small" @click="goToDetail(image.id)">
+                      查看详情
+                    </el-button>
+                  </div>
                 </el-card>
               </div>
             </section>
@@ -271,6 +276,10 @@ const formatResolution = (image: ImageSearchResult) => {
     return "未知分辨率";
   }
   return `${image.width} × ${image.height}`;
+};
+
+const goToDetail = (imageId: number) => {
+  router.push({ name: "image-detail", params: { imageId } });
 };
 
 const formatArguments = (args?: string) => {
@@ -577,6 +586,10 @@ const resetConversation = () => {
   margin: 8px 0 0;
   color: rgba(0, 0, 0, 0.55);
   font-size: 13px;
+}
+
+.match-actions {
+  margin-top: 8px;
 }
 
 @media (max-width: 768px) {

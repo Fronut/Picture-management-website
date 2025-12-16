@@ -2,6 +2,7 @@ import apiClient from "./apiClient";
 import type { ApiResponse, PageResponse } from "@/types/api";
 import type {
   ImageDeleteResult,
+  ImageDetail,
   ImageEditPayload,
   ImageEditResult,
   ImageSearchPayload,
@@ -75,6 +76,18 @@ export const fetchHighlightImages = async (
     throw new Error(data.message || "获取精选图片失败");
   }
 
+  return data.data;
+};
+
+export const fetchImageDetail = async (
+  imageId: number
+): Promise<ImageDetail> => {
+  const { data } = await apiClient.get<ApiResponse<ImageDetail>>(
+    `${IMAGE_BASE}/${imageId}`
+  );
+  if (!data.data) {
+    throw new Error(data.message || "获取图片详情失败");
+  }
   return data.data;
 };
 

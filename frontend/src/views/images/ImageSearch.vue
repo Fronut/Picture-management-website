@@ -211,23 +211,20 @@
                         {{ tag }}
                       </el-tag>
                     </el-space>
-                    <el-descriptions
-                      :column="2"
-                      size="small"
-                      class="meta-descriptions"
-                    >
-                      <el-descriptions-item label="分辨率">
-                        {{ formatResolution(image) }}
-                      </el-descriptions-item>
-                      <el-descriptions-item label="大小">
-                        {{ formatBytes(image.fileSize) }}
-                      </el-descriptions-item>
-                      <el-descriptions-item label="上传时间" :span="2">
-                        {{ formatDate(image.uploadTime) }}
-                      </el-descriptions-item>
-                    </el-descriptions>
+                    <p class="image-meta-line">
+                      {{ formatResolution(image) }} ·
+                      {{ formatBytes(image.fileSize) }} ·
+                      {{ formatDate(image.uploadTime) }}
+                    </p>
                     <div class="card-actions">
                       <el-space>
+                        <el-button
+                          text
+                          size="small"
+                          @click="goToDetail(image.id)"
+                        >
+                          查看详情
+                        </el-button>
                         <el-button
                           text
                           size="small"
@@ -673,6 +670,10 @@ const thumbnailUrl = (image: ImageSearchResult) => {
   return transparentPixel;
 };
 
+const goToDetail = (imageId: number) => {
+  router.push({ name: "image-detail", params: { imageId } });
+};
+
 const goToTagManager = (imageId: number) => {
   router.push({ name: "image-tags", params: { imageId } });
 };
@@ -865,8 +866,10 @@ watch(editDialogVisible, (visible) => {
   margin: 0;
 }
 
-.meta-descriptions {
-  margin-top: 8px;
+.image-meta-line {
+  margin: 0;
+  color: rgba(0, 0, 0, 0.55);
+  font-size: 13px;
 }
 
 .card-actions {
