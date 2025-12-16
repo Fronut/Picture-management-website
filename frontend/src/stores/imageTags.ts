@@ -123,30 +123,24 @@ export const useImageTagStore = defineStore("imageTags", {
         ElMessage.warning("请先选择图片");
         return;
       }
-      const normalized = tags
-        .map((tag) => {
-          if (typeof tag === "string") {
-            const name = tag.trim();
-            return name
-              ? {
-                  name,
-                  confidence: undefined,
-                }
-              : null;
+      const normalized: CustomTagInput[] = [];
+      tags.forEach((tag) => {
+        if (typeof tag === "string") {
+          const name = tag.trim();
+          if (name) {
+            normalized.push({ name });
           }
-          if (!tag?.name) {
-            return null;
-          }
-          const name = tag.name.trim();
-          if (!name.length) {
-            return null;
-          }
-          return {
-            name,
-            confidence: tag.confidence,
-          };
-        })
-        .filter((tag): tag is CustomTagInput => Boolean(tag));
+          return;
+        }
+        const name = tag?.name?.trim();
+        if (!name) {
+          return;
+        }
+        const hasConfidence = typeof tag.confidence === "number";
+        normalized.push(
+          hasConfidence ? { name, confidence: tag.confidence } : { name }
+        );
+      });
       if (!normalized.length) {
         ElMessage.warning("请输入至少一个标签");
         return;
