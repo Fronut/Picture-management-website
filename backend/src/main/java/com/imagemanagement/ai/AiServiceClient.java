@@ -35,6 +35,7 @@ public class AiServiceClient {
         private static final ParameterizedTypeReference<AiResponseEnvelope<AiChatSearchResult>> CHAT_TYPE =
             new ParameterizedTypeReference<>() {
             };
+    private static final int MAX_TAG_SUGGESTIONS = 5;
 
     private final RestTemplate restTemplate;
     private final String serviceUrl;
@@ -77,9 +78,8 @@ public class AiServiceClient {
 
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
         form.add("file", fileResource);
-        if (limit != null && limit > 0) {
-            form.add("limit", String.valueOf(limit));
-        }
+        int resolvedLimit = resolveRequestLimit(limit);
+        form.add("limit", String.valueOf(resolvedLimit));
         if (hints != null) {
             for (String hint : hints) {
                 if (StringUtils.hasText(hint)) {
@@ -132,5 +132,13 @@ public class AiServiceClient {
             throw new AiServiceException("AI service returned no data");
         }
         return data;
+    }
+
+    private int resolveRequestLimit(Integer limit) {
+        if (limit == null) {
+            return MAX_TAG_SUGGESTIONS;
+        }
+        int normalized = Math.max(1, limit);
+        return Math.min(normalized, MAX_TAG_SUGGESTIONS);
     }
 }

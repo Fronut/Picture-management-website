@@ -116,4 +116,37 @@ describe("image tag store", () => {
     expect(messageSpies.success).toHaveBeenCalledWith("标签已移除");
     expect(store.isMutating).toBe(false);
   });
+
+  it("sorts tags by confidence in descending order", async () => {
+    const store = useImageTagStore();
+    store.currentImageId = 12;
+    const unsorted = [
+      {
+        tagId: 1,
+        tagName: "low",
+        tagType: "AI",
+        usageCount: 1,
+        confidence: 0.25,
+      },
+      {
+        tagId: 2,
+        tagName: "high",
+        tagType: "AI",
+        usageCount: 3,
+        confidence: 0.92,
+      },
+      {
+        tagId: 3,
+        tagName: "string",
+        tagType: "AUTO",
+        usageCount: 2,
+        confidence: "0.4",
+      },
+    ];
+    mockFetchImageTags.mockResolvedValueOnce(unsorted);
+
+    await store.loadTags();
+
+    expect(store.tags.map((tag) => tag.tagId)).toEqual([2, 3, 1]);
+  });
 });

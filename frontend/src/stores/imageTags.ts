@@ -38,9 +38,29 @@ const defaultState = (): ImageTagState => ({
   aiGenerating: false,
 });
 
+const confidenceValue = (value: ImageTag["confidence"]): number => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
+const sortTagsByConfidence = (tags: ImageTag[]): ImageTag[] =>
+  [...tags].sort(
+    (a, b) => confidenceValue(b.confidence) - confidenceValue(a.confidence)
+  );
+
 export const useImageTagStore = defineStore("imageTags", {
   state: defaultState,
   actions: {
+    setTags(next: ImageTag[]) {
+      this.tags = sortTagsByConfidence(next);
+    },
+
     async initialize(imageId: number) {
       if (!imageId || Number.isNaN(imageId)) {
         ElMessage.warning("请提供有效的图片 ID");
@@ -57,7 +77,8 @@ export const useImageTagStore = defineStore("imageTags", {
       }
       this.isLoading = true;
       try {
-        this.tags = await fetchImageTags(targetId);
+        const fetched = await fetchImageTags(targetId);
+        this.setTags(fetched);
       } catch (error) {
         // 如果后端返回图片不存在（被删除），从上传页中移除残留记录并提示用户
         const anyErr: any = error;
@@ -72,7 +93,7 @@ export const useImageTagStore = defineStore("imageTags", {
             // ignore
           }
           this.currentImageId = null;
-          this.tags = [];
+          this.setTags([]);
           return;
         }
 
@@ -132,7 +153,8 @@ export const useImageTagStore = defineStore("imageTags", {
       }
       this.isMutating = true;
       try {
-        this.tags = await addCustomTags(this.currentImageId, normalized);
+        const updated = await addCustomTags(this.currentImageId, normalized);
+        this.setTags(updated);
         ElMessage.success("自定义标签已添加");
       } catch (error) {
         ElMessage.error(
@@ -155,7 +177,8 @@ export const useImageTagStore = defineStore("imageTags", {
       }
       this.isMutating = true;
       try {
-        this.tags = await addAiTags(this.currentImageId, filtered);
+        const updated = await addAiTags(this.currentImageId, filtered);
+        this.setTags(updated);
         ElMessage.success("AI 标签已同步");
       } catch (error) {
         ElMessage.error(
@@ -192,7 +215,8 @@ export const useImageTagStore = defineStore("imageTags", {
       }
       this.aiGenerating = true;
       try {
-        this.tags = await generateAiTags(this.currentImageId, options);
+        const updated = await generateAiTags(this.currentImageId, options);
+        this.setTags(updated);
         ElMessage.success("AI 已生成标签");
       } catch (error) {
         ElMessage.error(

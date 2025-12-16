@@ -14,7 +14,7 @@ public record AiTagGenerationRequest(
                 String> hints,
 
         @Min(value = 1, message = "limit must be at least 1")
-        @Max(value = 50, message = "limit must be at most 50")
+        @Max(value = 5, message = "limit must be at most 5")
         Integer limit
 ) {
 

@@ -10,6 +10,15 @@ import type {
 
 const IMAGE_BASE = "/images";
 const TAG_BASE = "/tags";
+const MAX_AI_TAG_LIMIT = 5;
+
+const sanitizeAiLimit = (limit?: number): number | undefined => {
+  if (typeof limit !== "number" || Number.isNaN(limit)) {
+    return undefined;
+  }
+  const normalized = Math.max(1, Math.trunc(limit));
+  return Math.min(normalized, MAX_AI_TAG_LIMIT);
+};
 
 export const fetchImageTags = async (imageId: number): Promise<ImageTag[]> => {
   const { data } = await apiClient.get<ApiResponse<ImageTag[]>>(
@@ -65,8 +74,9 @@ export const generateAiTags = async (
   if (options.hints && options.hints.length) {
     body.hints = options.hints;
   }
-  if (options.limit) {
-    body.limit = options.limit;
+  const resolvedLimit = sanitizeAiLimit(options.limit);
+  if (resolvedLimit) {
+    body.limit = resolvedLimit;
   }
 
   const { data } = await apiClient.post<ApiResponse<ImageTag[]>>(
