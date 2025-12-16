@@ -45,8 +45,8 @@ app:
     enabled: true
     username: ${APP_ADMIN_USERNAME:admin}
     email: ${APP_ADMIN_EMAIL:admin@example.com}
-    password: ${APP_ADMIN_PASSWORD:ChangeMe123!}
-    reset-password: ${APP_ADMIN_RESET_PASSWORD:false}
+    password: ${APP_ADMIN_PASSWORD:AdminReset123!}
+    reset-password: true
   cache:
     default-ttl: 5m
     users-ttl: 30m
@@ -105,8 +105,8 @@ app:
     enabled: true
     username: ${APP_ADMIN_USERNAME:admin}
     email: ${APP_ADMIN_EMAIL:admin@example.com}
-    password: ${APP_ADMIN_PASSWORD:ChangeMe123!}
-    reset-password: ${APP_ADMIN_RESET_PASSWORD:false}
+    password: ${APP_ADMIN_PASSWORD:AdminReset123!}
+    reset-password: true
   file:
     upload-dir: /app/uploads
     max-size: 104857600

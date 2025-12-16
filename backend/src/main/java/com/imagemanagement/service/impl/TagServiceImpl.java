@@ -13,11 +13,13 @@ import com.imagemanagement.entity.ImageTag;
 import com.imagemanagement.entity.Tag;
 import com.imagemanagement.entity.User;
 import com.imagemanagement.entity.enums.TagType;
+import com.imagemanagement.entity.enums.UserRole;
 import com.imagemanagement.exception.BadRequestException;
 import com.imagemanagement.exception.ResourceNotFoundException;
 import com.imagemanagement.repository.ImageRepository;
 import com.imagemanagement.repository.ImageTagRepository;
 import com.imagemanagement.repository.TagRepository;
+import com.imagemanagement.repository.UserRepository;
 import com.imagemanagement.service.TagService;
 import jakarta.transaction.Transactional;
 import java.io.IOException;
@@ -51,15 +53,18 @@ public class TagServiceImpl implements TagService {
     private final ImageRepository imageRepository;
     private final ImageTagRepository imageTagRepository;
     private final AiServiceClient aiServiceClient;
+    private final UserRepository userRepository;
 
     public TagServiceImpl(TagRepository tagRepository,
             ImageRepository imageRepository,
             ImageTagRepository imageTagRepository,
-            AiServiceClient aiServiceClient) {
+            AiServiceClient aiServiceClient,
+            UserRepository userRepository) {
         this.tagRepository = tagRepository;
         this.imageRepository = imageRepository;
         this.imageTagRepository = imageTagRepository;
         this.aiServiceClient = aiServiceClient;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -76,7 +81,7 @@ public class TagServiceImpl implements TagService {
     public List<ImageTagResponse> assignCustomTags(Long userId, Long imageId, TagAssignmentRequest request) {
         Objects.requireNonNull(userId, "userId cannot be null");
         Objects.requireNonNull(imageId, "imageId cannot be null");
-        Image image = loadOwnedImage(userId, imageId);
+        Image image = loadAccessibleImage(userId, imageId);
         List<TagCandidate> candidates = toCandidates(request.tagNames(), TagType.CUSTOM, CONFIDENCE_STRONG);
         attachCandidates(image, candidates);
         return getTagsForImage(imageId);
@@ -86,7 +91,7 @@ public class TagServiceImpl implements TagService {
     public List<ImageTagResponse> assignAiTags(Long userId, Long imageId, AiTagAssignmentRequest request) {
         Objects.requireNonNull(userId, "userId cannot be null");
         Objects.requireNonNull(imageId, "imageId cannot be null");
-        Image image = loadOwnedImage(userId, imageId);
+        Image image = loadAccessibleImage(userId, imageId);
         if (CollectionUtils.isEmpty(request.tags())) {
             throw new BadRequestException("tags cannot be empty");
         }
@@ -102,7 +107,7 @@ public class TagServiceImpl implements TagService {
     public List<ImageTagResponse> generateAiTags(Long userId, Long imageId, AiTagGenerationRequest request) {
         Objects.requireNonNull(userId, "userId cannot be null");
         Objects.requireNonNull(imageId, "imageId cannot be null");
-        Image image = loadOwnedImage(userId, imageId);
+        Image image = loadAccessibleImage(userId, imageId);
         byte[] payload = resolveImageBytes(image);
 
         List<String> hints = request != null ? sanitizeHints(request.hints()) : Collections.emptyList();
@@ -137,7 +142,7 @@ public class TagServiceImpl implements TagService {
         Objects.requireNonNull(userId, "userId cannot be null");
         Objects.requireNonNull(imageId, "imageId cannot be null");
         Objects.requireNonNull(tagId, "tagId cannot be null");
-        Image image = loadOwnedImage(userId, imageId);
+        Image image = loadAccessibleImage(userId, imageId);
         ImageTag imageTag = imageTagRepository.findByImageIdAndTagId(image.getId(), tagId)
                 .orElseThrow(() -> new BadRequestException("Tag is not attached to image"));
         imageTagRepository.delete(Objects.requireNonNull(imageTag));
@@ -332,16 +337,23 @@ public class TagServiceImpl implements TagService {
         return reference.setScale(2, RoundingMode.HALF_UP);
     }
 
-    private Image loadOwnedImage(Long userId, Long imageId) {
+    private Image loadAccessibleImage(Long userId, Long imageId) {
         Objects.requireNonNull(userId, "userId cannot be null");
         Objects.requireNonNull(imageId, "imageId cannot be null");
         Image image = imageRepository.findById(imageId)
                 .orElseThrow(() -> new BadRequestException("Image not found"));
         User owner = image.getUser();
-        if (owner == null || !Objects.equals(owner.getId(), userId)) {
+        boolean isOwner = owner != null && Objects.equals(owner.getId(), userId);
+        if (!isOwner && !hasAdminPrivileges(userId)) {
             throw new BadRequestException("You do not have permission to modify this image");
         }
         return image;
+    }
+
+    private boolean hasAdminPrivileges(Long userId) {
+        return userRepository.findById(userId)
+                .map(user -> user.getRole() == UserRole.ADMIN)
+                .orElse(false);
     }
 
     private void ensureImageExists(Long imageId) {
