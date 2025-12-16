@@ -31,6 +31,8 @@ import com.imagemanagement.service.TagService;
 import com.imagemanagement.service.ThumbnailService;
 import jakarta.transaction.Transactional;
 import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.awt.image.RescaleOp;
 import java.io.IOException;
@@ -225,6 +227,10 @@ public class ImageServiceImpl implements ImageService {
 
         if (request.getCrop() != null) {
             workingImage = applyCrop(workingImage, request.getCrop());
+        }
+
+        if (request.getRotation() != null && request.getRotation().hasRotation()) {
+            workingImage = applyRotation(workingImage, request.getRotation());
         }
 
         if (request.getToneAdjustment() != null && request.getToneAdjustment().hasAdjustments()) {
@@ -552,6 +558,34 @@ public class ImageServiceImpl implements ImageService {
 
         BufferedImage cropped = source.getSubimage(x, y, width, height);
         return deepCopy(cropped);
+    }
+
+    private BufferedImage applyRotation(BufferedImage source, ImageEditRequest.RotationOperation rotation) {
+        double degrees = rotation.getDegrees() != null ? rotation.getDegrees() : 0d;
+        if (Math.abs(degrees) < 0.01d) {
+            return source;
+        }
+
+        double radians = Math.toRadians(degrees);
+        double sin = Math.abs(Math.sin(radians));
+        double cos = Math.abs(Math.cos(radians));
+        int width = source.getWidth();
+        int height = source.getHeight();
+        int newWidth = (int) Math.floor(width * cos + height * sin);
+        int newHeight = (int) Math.floor(height * cos + width * sin);
+
+        BufferedImage rotated = new BufferedImage(newWidth, newHeight, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D graphics = rotated.createGraphics();
+        graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        AffineTransform transform = new AffineTransform();
+        transform.translate((newWidth - width) / 2.0, (newHeight - height) / 2.0);
+        transform.rotate(radians, width / 2.0, height / 2.0);
+        graphics.drawImage(source, transform, null);
+        graphics.dispose();
+        return rotated;
     }
 
     private BufferedImage applyToneAdjustment(BufferedImage source, ImageEditRequest.ToneAdjustment tone) {

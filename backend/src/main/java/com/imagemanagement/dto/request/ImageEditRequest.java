@@ -16,13 +16,18 @@ public class ImageEditRequest {
     @Valid
     private ToneAdjustment toneAdjustment;
 
+    @Valid
+    private RotationOperation rotation;
+
     @AssertTrue(message = "至少需要提供一种编辑操作")
     public boolean isValidOperationSet() {
         return hasAnyOperation();
     }
 
     public boolean hasAnyOperation() {
-        return crop != null || (toneAdjustment != null && toneAdjustment.hasAdjustments());
+        return crop != null
+            || (toneAdjustment != null && toneAdjustment.hasAdjustments())
+            || (rotation != null && rotation.hasRotation());
     }
 
     public CropOperation getCrop() {
@@ -39,6 +44,14 @@ public class ImageEditRequest {
 
     public void setToneAdjustment(ToneAdjustment toneAdjustment) {
         this.toneAdjustment = toneAdjustment;
+    }
+
+    public RotationOperation getRotation() {
+        return rotation;
+    }
+
+    public void setRotation(RotationOperation rotation) {
+        this.rotation = rotation;
     }
 
     public static class CropOperation {
@@ -134,6 +147,26 @@ public class ImageEditRequest {
             return (brightness != null && brightness != 0.0d)
                     || (contrast != null && contrast != 0.0d)
                     || (warmth != null && warmth != 0.0d);
+        }
+    }
+
+    public static class RotationOperation {
+
+        @NotNull
+        @DecimalMin(value = "-180.0")
+        @DecimalMax(value = "180.0")
+        private Double degrees;
+
+        public Double getDegrees() {
+            return degrees;
+        }
+
+        public void setDegrees(Double degrees) {
+            this.degrees = degrees;
+        }
+
+        public boolean hasRotation() {
+            return degrees != null && Math.abs(degrees) > 0.01d;
         }
     }
 }
