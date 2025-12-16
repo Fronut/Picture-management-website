@@ -226,6 +226,7 @@
                           查看详情
                         </el-button>
                         <el-button
+                          v-if="image.access?.canEdit"
                           text
                           size="small"
                           @click="openEditDialog(image)"
@@ -233,6 +234,7 @@
                           编辑
                         </el-button>
                         <el-button
+                          v-if="image.access?.canDelete"
                           text
                           type="danger"
                           size="small"
@@ -672,6 +674,10 @@ const goAiChat = () => {
 };
 
 const openEditDialog = (image: ImageSearchResult) => {
+  if (!image.access?.canEdit) {
+    ElMessage.warning("您没有权限编辑此图片");
+    return;
+  }
   editingImage.value = image;
   editDialogVisible.value = true;
 };
@@ -683,6 +689,10 @@ const handleEditApplied = (updated: ImageSearchResult) => {
 };
 
 const handleDeleteImage = async (image: ImageSearchResult) => {
+  if (!image.access?.canDelete) {
+    ElMessage.warning("您没有权限删除此图片");
+    return;
+  }
   try {
     await ElMessageBox.confirm(
       `删除后将无法恢复，确认删除「${image.originalFilename}」吗？`,

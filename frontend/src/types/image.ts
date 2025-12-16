@@ -93,6 +93,7 @@ export interface ImageSearchResult {
   takenTime?: string | null;
   tags: string[];
   thumbnails: ImageSummaryThumbnail[];
+  access?: ImageAccessInfo;
 }
 
 export interface ImageDeleteResult {

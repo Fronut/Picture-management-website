@@ -24,6 +24,7 @@ public class ImageSummaryResponse {
     private LocalDateTime takenTime;
     private List<String> tags = new ArrayList<>();
     private List<ThumbnailSummary> thumbnails = new ArrayList<>();
+    private AccessInfo access;
 
     public Long getId() {
         return id;
@@ -153,6 +154,14 @@ public class ImageSummaryResponse {
         this.thumbnails = thumbnails != null ? thumbnails : new ArrayList<>();
     }
 
+    public AccessInfo getAccess() {
+        return access;
+    }
+
+    public void setAccess(AccessInfo access) {
+        this.access = access;
+    }
+
     public static class ThumbnailSummary {
         private Long id;
         private ThumbnailSizeType sizeType;
@@ -207,6 +216,45 @@ public class ImageSummaryResponse {
 
         public void setFileSize(Integer fileSize) {
             this.fileSize = fileSize;
+        }
+    }
+
+    public static class AccessInfo {
+        private boolean canEdit;
+        private boolean canDelete;
+        private boolean canManageTags;
+        private boolean canDownloadOriginal;
+
+        public boolean isCanEdit() {
+            return canEdit;
+        }
+
+        public void setCanEdit(boolean canEdit) {
+            this.canEdit = canEdit;
+        }
+
+        public boolean isCanDelete() {
+            return canDelete;
+        }
+
+        public void setCanDelete(boolean canDelete) {
+            this.canDelete = canDelete;
+        }
+
+        public boolean isCanManageTags() {
+            return canManageTags;
+        }
+
+        public void setCanManageTags(boolean canManageTags) {
+            this.canManageTags = canManageTags;
+        }
+
+        public boolean isCanDownloadOriginal() {
+            return canDownloadOriginal;
+        }
+
+        public void setCanDownloadOriginal(boolean canDownloadOriginal) {
+            this.canDownloadOriginal = canDownloadOriginal;
         }
     }
 }

@@ -162,7 +162,9 @@ public class ImageServiceImpl implements ImageService {
         Pageable pageable = PageRequest.of(criteria.getPage(), criteria.getSize(), sort);
         Specification<Image> specification = Objects.requireNonNull(ImageSpecifications.build(criteria, userId));
         Page<Image> images = imageRepository.findAll(specification, pageable);
-        return PageResponse.from(images.map(this::toSummaryResponse));
+        return PageResponse.from(
+            images.map(image -> toSummaryResponse(image, isOwner(image, userId)))
+        );
     }
 
     @Override
@@ -228,7 +230,7 @@ public class ImageServiceImpl implements ImageService {
         entityManager.flush();
         entityManager.refresh(image);
 
-        return toSummaryResponse(image);
+        return toSummaryResponse(image, true);
     }
 
     @Override
@@ -241,8 +243,8 @@ public class ImageServiceImpl implements ImageService {
         Pageable pageable = PageRequest.of(0, pageSize, Sort.by(Sort.Direction.DESC, "uploadTime"));
         Page<Image> page = imageRepository.findByUser_IdOrderByUploadTimeDesc(userId, pageable);
         return page.getContent().stream()
-                .map(this::toSummaryResponse)
-                .toList();
+            .map(image -> toSummaryResponse(image, true))
+            .toList();
     }
 
     @Override
@@ -265,7 +267,7 @@ public class ImageServiceImpl implements ImageService {
 
     private ImageDetailResponse buildDetailResponse(Image image, boolean isOwner) {
         ImageDetailResponse response = new ImageDetailResponse();
-        response.setSummary(toSummaryResponse(image));
+        response.setSummary(toSummaryResponse(image, isOwner));
         response.setOwner(buildOwnerSummary(image.getUser()));
         response.setExif(buildExifDetails(image.getExifData()));
         response.setTagDetails(buildTagDetails(image.getImageTags()));
@@ -328,6 +330,24 @@ public class ImageServiceImpl implements ImageService {
         accessInfo.setCanDownloadOriginal(isOwner || image.getPrivacyLevel() == ImagePrivacyLevel.PUBLIC);
         accessInfo.setCanManageTags(isOwner);
         return accessInfo;
+    }
+
+    private ImageSummaryResponse.AccessInfo buildSummaryAccessInfo(Image image, boolean isOwner) {
+        ImageSummaryResponse.AccessInfo accessInfo = new ImageSummaryResponse.AccessInfo();
+        accessInfo.setCanEdit(isOwner);
+        accessInfo.setCanDelete(isOwner);
+        accessInfo.setCanManageTags(isOwner);
+        accessInfo.setCanDownloadOriginal(
+                isOwner || image.getPrivacyLevel() == ImagePrivacyLevel.PUBLIC
+        );
+        return accessInfo;
+    }
+
+    private boolean isOwner(Image image, Long userId) {
+        return userId != null
+                && image != null
+                && image.getUser() != null
+                && Objects.equals(image.getUser().getId(), userId);
     }
 
     private Image buildImageEntity(User user, FileStorageService.StoredFileInfo storedFile,
@@ -400,6 +420,10 @@ public class ImageServiceImpl implements ImageService {
     }
 
     private ImageSummaryResponse toSummaryResponse(Image image) {
+        return toSummaryResponse(image, false);
+    }
+
+    private ImageSummaryResponse toSummaryResponse(Image image, boolean isOwner) {
         ImageSummaryResponse response = new ImageSummaryResponse();
         response.setId(image.getId());
         response.setOriginalFilename(image.getOriginalFilename());
@@ -421,6 +445,7 @@ public class ImageServiceImpl implements ImageService {
 
         response.setTags(extractTagNames(image.getImageTags()));
         response.setThumbnails(extractThumbnailSummaries(image));
+        response.setAccess(buildSummaryAccessInfo(image, isOwner));
         return response;
     }
 
