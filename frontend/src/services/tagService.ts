@@ -3,6 +3,7 @@ import type { ApiResponse } from "@/types/api";
 import type {
   AiTagGenerationOptions,
   AiTagSuggestionInput,
+  CustomTagInput,
   ImageTag,
   TagSummary,
 } from "@/types/tag";
@@ -20,13 +21,18 @@ export const fetchImageTags = async (imageId: number): Promise<ImageTag[]> => {
 
 export const addCustomTags = async (
   imageId: number,
-  tagNames: string[]
+  tags: CustomTagInput[]
 ): Promise<ImageTag[]> => {
+  const payload = {
+    tags: tags.map((tag) => ({
+      name: tag.name,
+      confidence: tag.confidence,
+    })),
+  };
+
   const { data } = await apiClient.post<ApiResponse<ImageTag[]>>(
     `${IMAGE_BASE}/${imageId}/tags/custom`,
-    {
-      tagNames,
-    }
+    payload
   );
 
   return data.data ?? [];

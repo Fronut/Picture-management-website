@@ -114,25 +114,31 @@
       </el-row>
 
       <el-row :gutter="16" class="form-row">
-        <el-col :md="12" :xs="24">
+        <el-col :md="14" :xs="24">
           <el-card shadow="never">
             <template #header>
               <div class="card-header">
                 <div>
-                  <h4>添加自定义标签</h4>
-                  <p class="card-subtitle">支持一次批量提交多个标签</p>
+                  <h4>手动添加标签</h4>
+                  <p class="card-subtitle">
+                    支持选择已有标签或自定义输入，并可自定义置信度
+                  </p>
                 </div>
               </div>
             </template>
-            <el-form @submit.prevent>
-              <el-form-item label="标签列表">
+            <div class="tag-draft-list">
+              <div
+                v-for="(draft, index) in tagDrafts"
+                :key="index"
+                class="tag-draft-row"
+              >
                 <el-select
-                  v-model="customTagInput"
-                  multiple
+                  v-model="draft.name"
                   filterable
                   allow-create
                   default-first-option
-                  placeholder="输入后按 Enter 添加，可点热门标签快速填充"
+                  placeholder="输入或选择标签"
+                  class="name-select"
                 >
                   <el-option
                     v-for="tag in popularTags"
@@ -141,69 +147,53 @@
                     :value="tag.tagName"
                   />
                 </el-select>
-              </el-form-item>
-              <el-button
-                type="primary"
-                :loading="isMutating"
-                :disabled="!customTagInput.length"
-                @click="submitCustomTags"
-              >
-                提交
-              </el-button>
-            </el-form>
-          </el-card>
-        </el-col>
-
-        <el-col :md="12" :xs="24">
-          <el-card shadow="never">
-            <template #header>
-              <div class="card-header">
-                <div>
-                  <h4>同步 AI 标签</h4>
-                  <p class="card-subtitle">支持手动输入或直接让 AI 生成</p>
-                </div>
-              </div>
-            </template>
-            <div class="ai-form">
-              <div
-                v-for="(suggestion, index) in aiSuggestions"
-                :key="index"
-                class="ai-row"
-              >
-                <el-input
-                  v-model="suggestion.name"
-                  placeholder="如 sunset / portrait"
-                />
+                <el-select v-model="draft.tagType" class="type-select">
+                  <el-option label="自定义" value="CUSTOM" />
+                  <el-option label="AI 生成" value="AI" />
+                </el-select>
                 <el-input-number
-                  v-model="suggestion.confidence"
+                  v-model="draft.confidence"
                   :min="0"
                   :max="1"
                   :step="0.05"
+                  :precision="2"
                   :controls="false"
+                  class="confidence-input"
                   placeholder="置信度"
                 />
                 <el-button
                   text
                   type="danger"
-                  :disabled="aiSuggestions.length === 1"
-                  @click="removeSuggestionRow(index)"
+                  :disabled="tagDrafts.length === 1"
+                  @click="removeDraftRow(index)"
                 >
                   删除
                 </el-button>
               </div>
-              <el-button text type="primary" @click="addSuggestionRow">
+              <el-button text type="primary" @click="addDraftRow">
                 新增行
               </el-button>
             </div>
             <el-button
               type="primary"
-              plain
               :loading="isMutating"
-              @click="submitAiTags"
+              @click="submitTagDrafts"
             >
-              同步到后端
+              提交
             </el-button>
-            <el-divider>或</el-divider>
+          </el-card>
+        </el-col>
+
+        <el-col :md="10" :xs="24">
+          <el-card shadow="never">
+            <template #header>
+              <div class="card-header">
+                <div>
+                  <h4>让 AI 协助</h4>
+                  <p class="card-subtitle">输入提示词，自动生成一组标签</p>
+                </div>
+              </div>
+            </template>
             <el-form
               class="ai-generate-form"
               label-position="top"
@@ -249,7 +239,7 @@ import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { storeToRefs } from "pinia";
 
 import { useImageTagStore } from "@/stores/imageTags";
-import type { ImageTag } from "@/types/tag";
+import type { ImageTag, TagType } from "@/types/tag";
 
 interface Props {
   modelValue: boolean;
@@ -274,21 +264,27 @@ const {
 
 const imageId = computed(() => props.imageId ?? null);
 const initializedImageId = ref<number | null>(null);
-const customTagInput = ref<string[]>([]);
-const aiSuggestions = ref(
-  Array.from({ length: 2 }, () => ({ name: "", confidence: 0.9 }))
-);
+type TagDraft = {
+  name: string;
+  confidence: number;
+  tagType: TagType;
+};
+
+const createDraft = (overrides: Partial<TagDraft> = {}): TagDraft => ({
+  name: "",
+  confidence: 0.9,
+  tagType: "CUSTOM",
+  ...overrides,
+});
+
+const tagDrafts = ref<TagDraft[]>([createDraft()]);
 const aiHints = ref<string[]>([]);
 const aiGenerateLimit = ref<number>(6);
 
 const resetForms = () => {
-  customTagInput.value = [];
+  tagDrafts.value = [createDraft()];
   aiHints.value = [];
   aiGenerateLimit.value = 6;
-  aiSuggestions.value = Array.from({ length: 2 }, () => ({
-    name: "",
-    confidence: 0.9,
-  }));
 };
 
 const initializeIfNeeded = async () => {
@@ -347,42 +343,74 @@ const refreshPopular = () => {
 };
 
 const appendCustomTag = (tagName: string) => {
-  if (!customTagInput.value.includes(tagName)) {
-    customTagInput.value.push(tagName);
+  const trimmed = tagName.trim();
+  if (!trimmed) {
+    return;
   }
+  const vacancy = tagDrafts.value.find((draft) => !draft.name.trim());
+  if (vacancy) {
+    vacancy.name = trimmed;
+    vacancy.tagType = "CUSTOM";
+    return;
+  }
+  tagDrafts.value.push(createDraft({ name: trimmed, tagType: "CUSTOM" }));
 };
 
-const submitCustomTags = () => {
-  const payload = customTagInput.value.map((tag) => tag.trim()).filter(Boolean);
-  if (!payload.length) {
+const addDraftRow = () => {
+  tagDrafts.value.push(createDraft());
+};
+
+const removeDraftRow = (index: number) => {
+  if (tagDrafts.value.length === 1) return;
+  tagDrafts.value.splice(index, 1);
+};
+
+const clampConfidence = (value: number | undefined) => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return undefined;
+  }
+  if (value < 0) return 0;
+  if (value > 1) return 1;
+  return Number(value.toFixed(2));
+};
+
+const submitTagDrafts = async () => {
+  const prepared = tagDrafts.value
+    .map((draft) => ({
+      name: draft.name.trim(),
+      tagType: draft.tagType,
+      confidence: clampConfidence(draft.confidence),
+    }))
+    .filter((draft) => draft.name.length > 0);
+
+  if (!prepared.length) {
     ElMessage.warning("请输入至少一个标签");
     return;
   }
-  tagStore.addCustom(payload);
-  customTagInput.value = [];
-};
 
-const addSuggestionRow = () => {
-  aiSuggestions.value.push({ name: "", confidence: 0.85 });
-};
+  const customPayload = prepared
+    .filter((draft) => draft.tagType === "CUSTOM")
+    .map((draft) => ({ name: draft.name, confidence: draft.confidence }));
+  const aiPayload = prepared
+    .filter((draft) => draft.tagType === "AI")
+    .map((draft) => ({ name: draft.name, confidence: draft.confidence }));
 
-const removeSuggestionRow = (index: number) => {
-  if (aiSuggestions.value.length === 1) return;
-  aiSuggestions.value.splice(index, 1);
-};
-
-const submitAiTags = () => {
-  const payload = aiSuggestions.value
-    .map((item) => ({
-      name: item.name.trim(),
-      confidence: item.confidence ?? undefined,
-    }))
-    .filter((item) => item.name.length > 0);
-  if (!payload.length) {
-    ElMessage.warning("请先填写 AI 标签");
+  if (!customPayload.length && !aiPayload.length) {
+    ElMessage.warning("请选择至少一个标签类型");
     return;
   }
-  tagStore.addAi(payload);
+
+  try {
+    if (customPayload.length) {
+      await tagStore.addCustom(customPayload);
+    }
+    if (aiPayload.length) {
+      await tagStore.addAi(aiPayload);
+    }
+    tagDrafts.value = [createDraft()];
+  } catch (error) {
+    // 错误提示由 store 负责
+  }
 };
 
 const handleGenerateAi = () => {
@@ -487,26 +515,32 @@ const formatTagType = (type: string) => {
   margin-top: 8px;
 }
 
-.ai-form {
+.tag-draft-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
-.ai-row {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+.tag-draft-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px 140px auto;
+  gap: 12px;
+  align-items: center;
 }
 
-.ai-row .el-input,
-.ai-row .el-input-number {
-  flex: 1;
+.tag-draft-row .name-select,
+.tag-draft-row .type-select,
+.tag-draft-row .confidence-input {
+  width: 100%;
 }
 
 @media (max-width: 768px) {
   .tag-manager-drawer :deep(.el-drawer__body) {
     padding: 0 8px 16px;
+  }
+
+  .tag-draft-row {
+    grid-template-columns: 1fr;
   }
 }
 </style>

@@ -20,6 +20,15 @@ export interface AiTagSuggestionInput {
   confidence?: number;
 }
 
+export interface CustomTagInput {
+  name: string;
+  confidence?: number;
+}
+
+export interface TagDraftInput extends CustomTagInput {
+  tagType: TagType;
+}
+
 export interface AiTagGenerationOptions {
   hints?: string[];
   limit?: number;

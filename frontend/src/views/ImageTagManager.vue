@@ -112,22 +112,26 @@
     </el-row>
 
     <el-row :gutter="16" class="form-row">
-      <el-col :md="12" :xs="24">
+      <el-col :md="14" :xs="24">
         <el-card shadow="never">
           <template #header>
             <div class="card-header">
-              <h3>添加自定义标签</h3>
+              <h3>手动添加标签</h3>
             </div>
           </template>
-          <el-form @submit.prevent>
-            <el-form-item label="标签列表">
+          <div class="tag-draft-list">
+            <div
+              v-for="(draft, index) in tagDrafts"
+              :key="index"
+              class="tag-draft-row"
+            >
               <el-select
-                v-model="customTagInput"
-                multiple
+                v-model="draft.name"
                 filterable
                 allow-create
                 default-first-option
-                placeholder="输入后按 Enter 添加，可点击热门标签快速填充"
+                placeholder="输入或选择标签"
+                class="name-select"
               >
                 <el-option
                   v-for="tag in popularTags"
@@ -136,66 +140,50 @@
                   :value="tag.tagName"
                 />
               </el-select>
-            </el-form-item>
-            <el-button
-              type="primary"
-              :loading="isMutating"
-              :disabled="!customTagInput.length"
-              @click="submitCustomTags"
-            >
-              提交
-            </el-button>
-          </el-form>
-        </el-card>
-      </el-col>
-
-      <el-col :md="12" :xs="24">
-        <el-card shadow="never">
-          <template #header>
-            <div class="card-header">
-              <h3>同步 AI 标签</h3>
-            </div>
-          </template>
-          <div class="ai-form">
-            <div
-              v-for="(suggestion, index) in aiSuggestions"
-              :key="index"
-              class="ai-row"
-            >
-              <el-input
-                v-model="suggestion.name"
-                placeholder="如 sunset / portrait"
-              />
+              <el-select v-model="draft.tagType" class="type-select">
+                <el-option label="自定义" value="CUSTOM" />
+                <el-option label="AI 生成" value="AI" />
+              </el-select>
               <el-input-number
-                v-model="suggestion.confidence"
+                v-model="draft.confidence"
                 :min="0"
                 :max="1"
                 :step="0.05"
+                :precision="2"
                 :controls="false"
+                class="confidence-input"
                 placeholder="置信度"
               />
               <el-button
                 text
                 type="danger"
-                :disabled="aiSuggestions.length === 1"
-                @click="removeSuggestionRow(index)"
+                :disabled="tagDrafts.length === 1"
+                @click="removeDraftRow(index)"
               >
                 删除
               </el-button>
             </div>
-            <el-button text type="primary" @click="addSuggestionRow">
+            <el-button text type="primary" @click="addDraftRow">
               新增行
             </el-button>
           </div>
           <el-button
             type="primary"
-            plain
             :loading="isMutating"
-            @click="submitAiTags"
+            @click="submitTagDrafts"
           >
-            同步到后端
+            提交
           </el-button>
-          <el-divider>或</el-divider>
+        </el-card>
+      </el-col>
+
+      <el-col :md="10" :xs="24">
+        <el-card shadow="never">
+          <template #header>
+            <div class="card-header">
+              <h3>让 AI 协助</h3>
+            </div>
+          </template>
           <el-form
             class="ai-generate-form"
             label-position="top"
@@ -241,6 +229,7 @@ import { ElMessage } from "element-plus";
 import { useRoute, useRouter } from "vue-router";
 
 import { useImageTagStore } from "@/stores/imageTags";
+import type { TagDraftInput } from "@/types/tag";
 
 const router = useRouter();
 const route = useRoute();
@@ -269,6 +258,7 @@ watch(
     if (Number.isNaN(parsed)) {
       tagStore.$reset();
       editableImageId.value = null;
+      resetDrafts();
       return;
     }
     editableImageId.value = parsed;
@@ -277,18 +267,29 @@ watch(
   { immediate: true }
 );
 
-const customTagInput = ref<string[]>([]);
-const aiSuggestions = ref(
-  Array.from({ length: 2 }, () => ({ name: "", confidence: 0.9 }))
-);
+const createDraft = (
+  overrides: Partial<TagDraftInput> = {}
+): TagDraftInput => ({
+  name: "",
+  confidence: 0.9,
+  tagType: "CUSTOM",
+  ...overrides,
+});
+
+const tagDrafts = ref<TagDraftInput[]>([createDraft()]);
 const aiHints = ref<string[]>([]);
 const aiGenerateLimit = ref<number>(6);
+
+const resetDrafts = () => {
+  tagDrafts.value = [createDraft()];
+};
 
 const handleLoadImage = () => {
   if (!editableImageId.value) {
     ElMessage.warning("请输入有效的图片 ID");
     return;
   }
+  resetDrafts();
   router.replace({
     name: "image-tags",
     params: { imageId: editableImageId.value },
@@ -310,38 +311,72 @@ const refreshPopular = () => {
 };
 
 const appendCustomTag = (tagName: string) => {
-  if (!customTagInput.value.includes(tagName)) {
-    customTagInput.value.push(tagName);
-  }
-};
-
-const submitCustomTags = () => {
-  const payload = customTagInput.value.map((tag) => tag.trim()).filter(Boolean);
-  tagStore.addCustom(payload);
-  customTagInput.value = [];
-};
-
-const addSuggestionRow = () => {
-  aiSuggestions.value.push({ name: "", confidence: 0.85 });
-};
-
-const removeSuggestionRow = (index: number) => {
-  if (aiSuggestions.value.length === 1) return;
-  aiSuggestions.value.splice(index, 1);
-};
-
-const submitAiTags = () => {
-  const payload = aiSuggestions.value
-    .map((item) => ({
-      name: item.name.trim(),
-      confidence: item.confidence ?? undefined,
-    }))
-    .filter((item) => item.name.length > 0);
-  if (!payload.length) {
-    ElMessage.warning("请先填写 AI 标签");
+  const trimmed = tagName.trim();
+  if (!trimmed) return;
+  const vacancy = tagDrafts.value.find((draft) => !draft.name.trim());
+  if (vacancy) {
+    vacancy.name = trimmed;
+    vacancy.tagType = "CUSTOM";
     return;
   }
-  tagStore.addAi(payload);
+  tagDrafts.value.push(createDraft({ name: trimmed, tagType: "CUSTOM" }));
+};
+
+const addDraftRow = () => {
+  tagDrafts.value.push(createDraft());
+};
+
+const removeDraftRow = (index: number) => {
+  if (tagDrafts.value.length === 1) return;
+  tagDrafts.value.splice(index, 1);
+};
+
+const clampConfidence = (value: number | undefined) => {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    return undefined;
+  }
+  if (value < 0) return 0;
+  if (value > 1) return 1;
+  return Number(value.toFixed(2));
+};
+
+const submitTagDrafts = async () => {
+  const prepared = tagDrafts.value
+    .map((draft) => ({
+      name: draft.name.trim(),
+      tagType: draft.tagType,
+      confidence: clampConfidence(draft.confidence),
+    }))
+    .filter((draft) => draft.name.length > 0);
+
+  if (!prepared.length) {
+    ElMessage.warning("请输入至少一个标签");
+    return;
+  }
+
+  const customPayload = prepared
+    .filter((draft) => draft.tagType === "CUSTOM")
+    .map((draft) => ({ name: draft.name, confidence: draft.confidence }));
+  const aiPayload = prepared
+    .filter((draft) => draft.tagType === "AI")
+    .map((draft) => ({ name: draft.name, confidence: draft.confidence }));
+
+  if (!customPayload.length && !aiPayload.length) {
+    ElMessage.warning("请选择至少一个标签类型");
+    return;
+  }
+
+  try {
+    if (customPayload.length) {
+      await tagStore.addCustom(customPayload);
+    }
+    if (aiPayload.length) {
+      await tagStore.addAi(aiPayload);
+    }
+    resetDrafts();
+  } catch (error) {
+    // store handles errors
+  }
 };
 
 const handleGenerateAi = () => {
@@ -440,10 +475,23 @@ const formatTagType = (type: string) => {
   margin-top: 16px;
 }
 
-.ai-form {
+.tag-draft-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.tag-draft-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px 140px auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.tag-draft-row .name-select,
+.tag-draft-row .type-select,
+.tag-draft-row .confidence-input {
+  width: 100%;
 }
 
 .ai-generate-form {
@@ -453,20 +501,13 @@ const formatTagType = (type: string) => {
   margin-top: 12px;
 }
 
-.ai-row {
-  display: grid;
-  grid-template-columns: 1fr 120px auto;
-  gap: 8px;
-  align-items: center;
-}
-
 @media (max-width: 768px) {
   .card-header {
     flex-direction: column;
     align-items: flex-start;
   }
 
-  .ai-row {
+  .tag-draft-row {
     grid-template-columns: 1fr;
   }
 }

@@ -13,6 +13,7 @@ import { useImageUploadStore } from "@/stores/imageUpload";
 import type {
   AiTagGenerationOptions,
   AiTagSuggestionInput,
+  CustomTagInput,
   ImageTag,
   TagSummary,
 } from "@/types/tag";
@@ -96,18 +97,24 @@ export const useImageTagStore = defineStore("imageTags", {
       }
     },
 
-    async addCustom(tagNames: string[]) {
+    async addCustom(tags: CustomTagInput[]) {
       if (!this.currentImageId) {
         ElMessage.warning("请先选择图片");
         return;
       }
-      if (!tagNames.length) {
+      const normalized = tags
+        .map((tag) => ({
+          name: tag.name.trim(),
+          confidence: tag.confidence,
+        }))
+        .filter((tag) => tag.name.length);
+      if (!normalized.length) {
         ElMessage.warning("请输入至少一个标签");
         return;
       }
       this.isMutating = true;
       try {
-        this.tags = await addCustomTags(this.currentImageId, tagNames);
+        this.tags = await addCustomTags(this.currentImageId, normalized);
         ElMessage.success("自定义标签已添加");
       } catch (error) {
         ElMessage.error(
