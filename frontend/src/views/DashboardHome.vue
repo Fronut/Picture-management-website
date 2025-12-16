@@ -38,10 +38,7 @@
             indicator-position="outside"
           >
             <el-carousel-item v-for="image in highlights" :key="image.id">
-              <div
-                class="carousel-slide"
-                :style="backgroundStyle(image.filePath)"
-              >
+              <div class="carousel-slide" :style="backgroundStyle(image)">
                 <div class="slide-overlay">
                   <span class="slide-filename">{{
                     image.originalFilename
