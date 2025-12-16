@@ -280,19 +280,6 @@ const previewReady = computed(
     !!originalImageElement.value && !previewLoading.value && !previewError.value
 );
 
-watch(
-  () => props.modelValue,
-  (visible) => {
-    if (visible && props.image) {
-      void loadPreviewSource();
-      queueRenderPreview();
-    }
-    if (!visible) {
-      cleanupPreviewResources();
-    }
-  }
-);
-
 const hasCropSelection = computed(
   () =>
     form.cropEnabled &&
@@ -366,73 +353,6 @@ const resetForm = () => {
   form.crop.width = width > 0 ? width : 0;
   form.crop.height = height > 0 ? height : 0;
 };
-
-watch(
-  () => props.image,
-  () => {
-    resetForm();
-    cleanupPreviewResources();
-    if (props.image && props.modelValue) {
-      void loadPreviewSource();
-    }
-  },
-  { immediate: true }
-);
-
-watch(
-  () => form.crop.x,
-  (value) => {
-    if (!props.image?.width) {
-      return;
-    }
-    const maxStart = Math.max(0, props.image.width - 1);
-    if (value > maxStart) {
-      form.crop.x = maxStart;
-    }
-    if (form.crop.width > maxCropWidth.value) {
-      form.crop.width = maxCropWidth.value;
-    }
-  }
-);
-
-watch(
-  () => form.crop.y,
-  (value) => {
-    if (!props.image?.height) {
-      return;
-    }
-    const maxStart = Math.max(0, props.image.height - 1);
-    if (value > maxStart) {
-      form.crop.y = maxStart;
-    }
-    if (form.crop.height > maxCropHeight.value) {
-      form.crop.height = maxCropHeight.value;
-    }
-  }
-);
-
-watch(
-  () => [
-    form.cropEnabled,
-    form.crop.x,
-    form.crop.y,
-    form.crop.width,
-    form.crop.height,
-    form.toneEnabled,
-    form.tone.brightness,
-    form.tone.contrast,
-    form.tone.warmth,
-    form.rotationEnabled,
-    form.rotation.degrees,
-  ],
-  () => {
-    queueRenderPreview();
-  }
-);
-
-onBeforeUnmount(() => {
-  cleanupPreviewResources();
-});
 
 const clampValue = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -768,6 +688,86 @@ const handleSubmit = async () => {
     submitting.value = false;
   }
 };
+
+watch(
+  () => props.modelValue,
+  (visible) => {
+    if (visible && props.image) {
+      void loadPreviewSource();
+      queueRenderPreview();
+    }
+    if (!visible) {
+      cleanupPreviewResources();
+    }
+  }
+);
+
+watch(
+  () => props.image,
+  () => {
+    resetForm();
+    cleanupPreviewResources();
+    if (props.image && props.modelValue) {
+      void loadPreviewSource();
+    }
+  },
+  { immediate: true }
+);
+
+watch(
+  () => form.crop.x,
+  (value) => {
+    if (!props.image?.width) {
+      return;
+    }
+    const maxStart = Math.max(0, props.image.width - 1);
+    if (value > maxStart) {
+      form.crop.x = maxStart;
+    }
+    if (form.crop.width > maxCropWidth.value) {
+      form.crop.width = maxCropWidth.value;
+    }
+  }
+);
+
+watch(
+  () => form.crop.y,
+  (value) => {
+    if (!props.image?.height) {
+      return;
+    }
+    const maxStart = Math.max(0, props.image.height - 1);
+    if (value > maxStart) {
+      form.crop.y = maxStart;
+    }
+    if (form.crop.height > maxCropHeight.value) {
+      form.crop.height = maxCropHeight.value;
+    }
+  }
+);
+
+watch(
+  () => [
+    form.cropEnabled,
+    form.crop.x,
+    form.crop.y,
+    form.crop.width,
+    form.crop.height,
+    form.toneEnabled,
+    form.tone.brightness,
+    form.tone.contrast,
+    form.tone.warmth,
+    form.rotationEnabled,
+    form.rotation.degrees,
+  ],
+  () => {
+    queueRenderPreview();
+  }
+);
+
+onBeforeUnmount(() => {
+  cleanupPreviewResources();
+});
 </script>
 
 <style scoped>
