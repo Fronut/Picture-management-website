@@ -103,6 +103,22 @@ class ImageDetailControllerTest {
     }
 
     @Test
+    void getImageDetail_shouldAllowAdminToViewPrivateImage() throws Exception {
+        User owner = persistUser("detail-owner3", "detail-owner3@example.com");
+        User admin = persistUser("detail-admin", "detail-admin@example.com", UserRole.ADMIN);
+        Tag tag = persistTag("confidential", TagType.CUSTOM);
+        Image image = persistImage(owner, tag, ImagePrivacyLevel.PRIVATE);
+
+        String token = loginAndGetToken(admin.getUsername());
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/images/{imageId}", image.getId())
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.access.canEdit").value(true))
+                .andExpect(jsonPath("$.data.access.canManageTags").value(true));
+    }
+
+    @Test
     void getImageDetail_shouldReturn404ForMissingImage() throws Exception {
         User viewer = persistUser("detail-missing", "detail-missing@example.com");
         String token = loginAndGetToken(viewer.getUsername());
@@ -113,12 +129,16 @@ class ImageDetailControllerTest {
     }
 
     private User persistUser(String username, String email) {
+        return persistUser(username, email, UserRole.USER);
+    }
+
+    private User persistUser(String username, String email, UserRole role) {
         User user = new User();
         user.setUsername(username);
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(DEFAULT_PASSWORD));
         user.setStatus(UserStatus.ACTIVE);
-        user.setRole(UserRole.USER);
+        user.setRole(role);
         return userRepository.save(user);
     }
 

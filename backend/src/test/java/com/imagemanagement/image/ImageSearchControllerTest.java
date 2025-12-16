@@ -141,6 +141,47 @@ class ImageSearchControllerTest {
                 .andExpect(jsonPath("$.data.content[0].id").value(publicImage.getId()));
     }
 
+            @Test
+            void searchImages_shouldExposeAccessPermissionsForOwnerViewerAndAdmin() throws Exception {
+            User owner = persistUser("access-owner", "access-owner@example.com");
+            User viewer = persistUser("access-viewer", "access-viewer@example.com");
+            User admin = persistUser("access-admin", "access-admin@example.com", UserRole.ADMIN);
+            Tag scenic = persistTag("scenic");
+
+            Image publicImage = persistImage(owner, "scenic.jpg", ImagePrivacyLevel.PUBLIC, 1920, 1080, List.of(scenic));
+
+            ImageSearchRequest request = new ImageSearchRequest();
+            request.setOnlyOwn(false);
+            request.setPage(0);
+            request.setSize(5);
+
+            mockMvc.perform(post("/api/images/search")
+                    .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                    .content(json(request))
+                    .header("Authorization", "Bearer " + loginAndGetToken(owner.getUsername())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].access.canEdit").value(true))
+                .andExpect(jsonPath("$.data.content[0].access.canDelete").value(true));
+
+            mockMvc.perform(post("/api/images/search")
+                    .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                    .content(json(request))
+                    .header("Authorization", "Bearer " + loginAndGetToken(viewer.getUsername())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].access.canEdit").value(false))
+                .andExpect(jsonPath("$.data.content[0].access.canDelete").value(false));
+
+            mockMvc.perform(post("/api/images/search")
+                    .contentType(Objects.requireNonNull(MediaType.APPLICATION_JSON))
+                    .content(json(request))
+                    .header("Authorization", "Bearer " + loginAndGetToken(admin.getUsername())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].access.canEdit").value(true))
+                .andExpect(jsonPath("$.data.content[0].access.canDelete").value(true));
+
+            assertThat(publicImage.getId()).isPositive();
+            }
+
     @Test
     void searchImages_shouldRejectInvalidDimensionRange() throws Exception {
         User owner = persistUser("dimension-owner", "dimension@example.com");
@@ -186,12 +227,16 @@ class ImageSearchControllerTest {
     }
 
     private User persistUser(String username, String email) {
+        return persistUser(username, email, UserRole.USER);
+    }
+
+    private User persistUser(String username, String email, UserRole role) {
         User user = new User();
         user.setUsername(username);
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode(DEFAULT_PASSWORD));
         user.setStatus(UserStatus.ACTIVE);
-        user.setRole(UserRole.USER);
+        user.setRole(role);
         return userRepository.save(user);
     }
 

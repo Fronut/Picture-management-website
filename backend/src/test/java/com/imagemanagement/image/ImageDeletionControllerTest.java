@@ -117,13 +117,34 @@ class ImageDeletionControllerTest {
         assertThat(Files.exists(Path.of(stored.getFilePath()))).isTrue();
     }
 
+    @Test
+    void deleteImage_shouldAllowAdminToRemoveOtherUsersImage() throws Exception {
+        User owner = persistUser("delete-owner2", "delete-owner2@example.com");
+        String ownerToken = loginAndGetToken(owner.getUsername());
+        long imageId = uploadSampleImage(ownerToken);
+
+        User admin = persistUser("delete-admin", "delete-admin@example.com", UserRole.ADMIN);
+        String adminToken = loginAndGetToken(admin.getUsername());
+
+        mockMvc.perform(delete("/api/images/{imageId}", imageId)
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deletedImageId").value(imageId));
+
+        assertThat(imageRepository.findById(imageId)).isEmpty();
+    }
+
     private User persistUser(String username, String email) {
+        return persistUser(username, email, UserRole.USER);
+    }
+
+    private User persistUser(String username, String email, UserRole role) {
         User user = new User();
         user.setUsername(username);
         user.setEmail(email);
         user.setPasswordHash(passwordEncoder.encode("Password123"));
         user.setStatus(UserStatus.ACTIVE);
-        user.setRole(UserRole.USER);
+        user.setRole(role);
         return userRepository.save(user);
     }
 
