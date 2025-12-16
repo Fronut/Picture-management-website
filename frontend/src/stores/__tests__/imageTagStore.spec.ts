@@ -85,7 +85,9 @@ describe("image tag store", () => {
 
     await store.addCustom(["macro"]);
 
-    expect(mockAddCustomTags).toHaveBeenCalledWith(9, ["macro"]);
+    expect(mockAddCustomTags).toHaveBeenCalledWith(9, [
+      { name: "macro", confidence: undefined },
+    ]);
     expect(store.tags).toEqual(nextTags);
     expect(store.isMutating).toBe(false);
     expect(messageSpies.success).toHaveBeenCalledWith("自定义标签已添加");

@@ -97,17 +97,35 @@ export const useImageTagStore = defineStore("imageTags", {
       }
     },
 
-    async addCustom(tags: CustomTagInput[]) {
+    async addCustom(tags: Array<CustomTagInput | string>) {
       if (!this.currentImageId) {
         ElMessage.warning("请先选择图片");
         return;
       }
       const normalized = tags
-        .map((tag) => ({
-          name: tag.name.trim(),
-          confidence: tag.confidence,
-        }))
-        .filter((tag) => tag.name.length);
+        .map((tag) => {
+          if (typeof tag === "string") {
+            const name = tag.trim();
+            return name
+              ? {
+                  name,
+                  confidence: undefined,
+                }
+              : null;
+          }
+          if (!tag?.name) {
+            return null;
+          }
+          const name = tag.name.trim();
+          if (!name.length) {
+            return null;
+          }
+          return {
+            name,
+            confidence: tag.confidence,
+          };
+        })
+        .filter((tag): tag is CustomTagInput => Boolean(tag));
       if (!normalized.length) {
         ElMessage.warning("请输入至少一个标签");
         return;
