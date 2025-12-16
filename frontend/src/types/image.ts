@@ -68,10 +68,15 @@ export interface ImageEditToneAdjustment {
   warmth?: number;
 }
 
+export interface ImageEditRotation {
+  degrees: number;
+}
+
 export interface ImageEditPayload {
   imageId: number;
   crop?: ImageEditCrop;
   toneAdjustment?: ImageEditToneAdjustment;
+  rotation?: ImageEditRotation;
 }
 
 export type ImageEditResult = ImageSearchResult;

@@ -147,7 +147,17 @@ export const editImage = async (
     requestBody.toneAdjustment = tone;
   }
 
-  if (!requestBody.crop && !requestBody.toneAdjustment) {
+  if (payload.rotation) {
+    requestBody.rotation = {
+      degrees: Number(payload.rotation.degrees.toFixed(1)),
+    };
+  }
+
+  if (
+    !requestBody.crop &&
+    !requestBody.toneAdjustment &&
+    !requestBody.rotation
+  ) {
     throw new Error("请至少选择一个编辑操作");
   }
 
