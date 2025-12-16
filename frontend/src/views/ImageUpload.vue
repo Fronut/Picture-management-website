@@ -1,10 +1,26 @@
-                  <el-button
-                    text
-                    size="small"
-                    @click="goToDetail(image.id)"
-                  >
-                    查看详情
-                  </el-button>
+<template>
+  <section class="upload-page">
+    <el-row :gutter="24">
+      <el-col :xs="24" :lg="16">
+        <el-card shadow="never" class="upload-card">
+          <template #header>
+            <div class="card-header">
+              <div>
+                <h3>批量上传图片</h3>
+                <p>支持拖拽、批量文件，单文件上限 20MB</p>
+              </div>
+              <el-button
+                text
+                size="small"
+                :disabled="!hasFiles || isUploading"
+                @click="handleClearAll"
+              >
+                清空列表
+              </el-button>
+            </div>
+          </template>
+
+          <el-upload
             ref="uploadRef"
             drag
             action=""
@@ -32,8 +48,8 @@
           <el-form label-width="80px" class="upload-form">
             <el-form-item label="隐私">
               <el-radio-group v-model="privacyLevel">
-                <el-radio-button label="PRIVATE"> 私有 </el-radio-button>
-                <el-radio-button label="PUBLIC"> 公开 </el-radio-button>
+                <el-radio-button label="PRIVATE">私有</el-radio-button>
+                <el-radio-button label="PUBLIC">公开</el-radio-button>
               </el-radio-group>
             </el-form-item>
             <el-form-item label="描述">
@@ -235,6 +251,10 @@ const handleUpload = () => {
 
 const goToDetail = (imageId: number) => {
   router.push({ name: "image-detail", params: { imageId } });
+};
+
+const goToTagManager = (imageId: number) => {
+  router.push({ name: "image-tags", params: { imageId } });
 };
 
 const formatBytes = (size: number) => {
