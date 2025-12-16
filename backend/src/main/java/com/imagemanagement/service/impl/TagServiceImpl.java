@@ -48,6 +48,8 @@ public class TagServiceImpl implements TagService {
 
     private static final BigDecimal CONFIDENCE_STRONG = BigDecimal.valueOf(1.00).setScale(2, RoundingMode.HALF_UP);
     private static final BigDecimal CONFIDENCE_AUTO = BigDecimal.valueOf(0.85).setScale(2, RoundingMode.HALF_UP);
+    private static final int MAX_AI_GENERATED_TAGS = 5;
+    private static final double MIN_AI_CONFIDENCE_THRESHOLD = 0.3d;
 
     private final TagRepository tagRepository;
     private final ImageRepository imageRepository;
@@ -112,12 +114,13 @@ public class TagServiceImpl implements TagService {
 
         List<String> hints = request != null ? sanitizeHints(request.hints()) : Collections.emptyList();
         Integer limit = request != null ? request.limit() : null;
+        int resolvedLimit = resolveGenerationLimit(limit);
 
         AiTagSuggestionResponse response = aiServiceClient.suggestTags(
                 payload,
                 image.getOriginalFilename(),
                 hints.isEmpty() ? null : hints,
-                limit);
+            resolvedLimit);
 
         if (response == null || CollectionUtils.isEmpty(response.tags())) {
             throw new BadRequestException("AI service returned no tag suggestions");
@@ -125,13 +128,14 @@ public class TagServiceImpl implements TagService {
 
         List<AiTagAssignmentRequest.TagSuggestion> suggestions = response.tags().stream()
                 .filter(suggestion -> StringUtils.hasText(suggestion.name()))
+            .filter(suggestion -> suggestion.confidence() >= MIN_AI_CONFIDENCE_THRESHOLD)
                 .map(suggestion -> new AiTagAssignmentRequest.TagSuggestion(
                         suggestion.name(),
                         BigDecimal.valueOf(suggestion.confidence())))
                 .toList();
 
         if (suggestions.isEmpty()) {
-            throw new BadRequestException("AI service returned no valid tag names");
+            throw new BadRequestException("AI service returned no valid tag names with sufficient confidence");
         }
 
         return assignAiTags(userId, imageId, new AiTagAssignmentRequest(suggestions));
@@ -288,6 +292,14 @@ public class TagServiceImpl implements TagService {
         if (!newLinks.isEmpty()) {
             imageTagRepository.saveAll(newLinks);
         }
+    }
+
+    private int resolveGenerationLimit(Integer requestedLimit) {
+        if (requestedLimit == null) {
+            return MAX_AI_GENERATED_TAGS;
+        }
+        int normalized = Math.max(1, requestedLimit);
+        return Math.min(normalized, MAX_AI_GENERATED_TAGS);
     }
 
     private TagCandidate preferHigherConfidence(TagCandidate left, TagCandidate right) {
