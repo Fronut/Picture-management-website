@@ -656,4 +656,30 @@ const resetConversation = () => {
     justify-content: flex-start;
   }
 }
+
+@media (max-width: 640px) {
+  .ai-chat {
+    padding-bottom: 12px;
+  }
+
+  .card-header {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .chat-card,
+  .result-card {
+    margin-bottom: 12px;
+  }
+
+  .message-content.markdown pre {
+    font-size: 12px;
+    padding: 8px;
+  }
+
+  .composer-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
 </style>
