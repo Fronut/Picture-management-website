@@ -392,4 +392,19 @@ const formatTimestamp = (value: string) => {
     flex-basis: 100%;
   }
 }
+
+@media (max-width: 640px) {
+  .card-header {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .candidate-table {
+    margin: 0 -4px;
+  }
+
+  .candidate-table :deep(.el-table) {
+    min-width: 100%;
+  }
+}
 </style>

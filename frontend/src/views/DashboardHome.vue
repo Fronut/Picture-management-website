@@ -680,6 +680,31 @@ watch(highlightPool, syncManualSelection);
   }
 }
 
+@media (max-width: 640px) {
+  .dashboard {
+    padding: 12px 0 28px;
+  }
+
+  .hero-card {
+    gap: 20px;
+    padding: 20px;
+    border-radius: 24px;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fullscreen-carousel__controls {
+    padding: 14px 18px;
+  }
+
+  .fullscreen-carousel__player {
+    padding: 0 14px 18px;
+  }
+}
+
 .selection-tip {
   margin: 0 0 12px;
   color: #4a5568;

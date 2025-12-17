@@ -911,4 +911,26 @@ watch(editDialogVisible, (visible) => {
     margin-bottom: 12px;
   }
 }
+
+@media (max-width: 640px) {
+  .filter-card,
+  .result-card {
+    margin-bottom: 12px;
+  }
+
+  .inline-input,
+  .range-inputs {
+    width: 100%;
+  }
+
+  .range-inputs {
+    flex-wrap: wrap;
+  }
+
+  .card-actions {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+}
 </style>
