@@ -14,14 +14,16 @@
             立即上传图片
           </el-button>
           <el-button
-            text
-            :loading="highlightsLoading"
-            @click="refreshHighlights"
+            plain
+            size="large"
+            :disabled="!visibleHighlights.length || highlightsLoading"
+            @click="enterFullscreenCarousel"
           >
-            刷新精选
+            全屏播放
           </el-button>
           <el-button
             plain
+            size="large"
             :disabled="!highlightPool.length || highlightsLoading"
             @click="openManageDialog"
           >
@@ -103,8 +105,9 @@
     <el-dialog
       v-model="manageDialogVisible"
       title="管理精选展示"
-      width="720px"
+      width="880px"
       destroy-on-close
+      class="manage-dialog"
     >
       <p class="selection-tip">
         选择希望在轮播中展示的图片，最多
@@ -124,19 +127,34 @@
           恢复自动展示
         </el-button>
       </div>
-      <el-checkbox-group v-model="selectionDraft" class="selection-grid">
-        <el-checkbox
-          v-for="image in filteredSelectionCandidates"
-          :key="image.id"
-          :label="image.id"
-          class="selection-item"
+      <div class="selection-grid-panel">
+        <el-checkbox-group
+          v-model="selectionDraft"
+          class="selection-grid__group"
         >
-          <div class="selection-thumb" :style="backgroundStyle(image)">
-            <span class="selection-name">{{ image.originalFilename }}</span>
-            <small class="selection-meta">{{ formatResolution(image) }}</small>
-          </div>
-        </el-checkbox>
-      </el-checkbox-group>
+          <el-checkbox
+            v-for="image in filteredSelectionCandidates"
+            :key="image.id"
+            :label="image.id"
+            class="selection-item"
+          >
+            <div class="selection-thumb">
+              <img
+                class="selection-thumb__image"
+                :src="previewSource(image)"
+                :alt="image.originalFilename || '精选图片'"
+                loading="lazy"
+              />
+              <div class="selection-thumb__overlay">
+                <span class="selection-name">{{ image.originalFilename }}</span>
+                <small class="selection-meta">
+                  {{ formatResolution(image) }}
+                </small>
+              </div>
+            </div>
+          </el-checkbox>
+        </el-checkbox-group>
+      </div>
       <template #footer>
         <div class="dialog-footer">
           <span class="selection-count">
@@ -151,6 +169,53 @@
         </div>
       </template>
     </el-dialog>
+    <teleport to="body">
+      <div
+        v-if="fullscreenCarouselActive && visibleHighlights.length"
+        class="fullscreen-carousel"
+        role="dialog"
+        aria-modal="true"
+      >
+        <div class="fullscreen-carousel__controls">
+          <span class="controls-title">精选轮播</span>
+          <el-button
+            type="primary"
+            round
+            plain
+            size="large"
+            @click="exitFullscreenCarousel"
+          >
+            退出全屏
+          </el-button>
+        </div>
+        <div class="fullscreen-carousel__player">
+          <el-carousel
+            :interval="5500"
+            :height="fullscreenCarouselHeight"
+            :autoplay="true"
+            :loop="true"
+            :pause-on-hover="false"
+            indicator-position="none"
+            trigger="click"
+            arrow="always"
+          >
+            <el-carousel-item
+              v-for="image in visibleHighlights"
+              :key="`fullscreen-${image.id}`"
+            >
+              <div class="fullscreen-slide" :style="backgroundStyle(image)">
+                <div class="slide-overlay">
+                  <span class="slide-filename">
+                    {{ image.originalFilename }}
+                  </span>
+                  <span class="slide-meta">{{ formatResolution(image) }}</span>
+                </div>
+              </div>
+            </el-carousel-item>
+          </el-carousel>
+        </div>
+      </div>
+    </teleport>
   </section>
 </template>
 
@@ -177,6 +242,7 @@ type HighlightItem = ImageSearchResult & { previewUrl?: string };
 const HIGHLIGHT_SELECTION_KEY = "pm.dashboard.highlightSelection";
 const MAX_MANUAL_SELECTION = 8;
 const HIGHLIGHT_FETCH_SIZE = 16;
+const fullscreenCarouselHeight = "calc(100vh - 160px)";
 
 const highlightPool = ref<HighlightItem[]>([]);
 const highlightsLoading = ref(false);
@@ -184,15 +250,20 @@ const manualHighlightIds = ref<number[]>(loadStoredSelection());
 const manageDialogVisible = ref(false);
 const selectionDraft = ref<number[]>([]);
 const selectionFilter = ref("");
+const fullscreenCarouselActive = ref(false);
 
 const visibleHighlights = computed(() => {
   if (!manualHighlightIds.value.length) {
     return highlightPool.value;
   }
   const map = new Map(highlightPool.value.map((item) => [item.id, item]));
-  return manualHighlightIds.value
+  const manual = manualHighlightIds.value
     .map((id) => map.get(id))
     .filter((item): item is HighlightItem => Boolean(item));
+  if (manual.length) {
+    return manual;
+  }
+  return highlightPool.value;
 });
 
 const filteredSelectionCandidates = computed(() => {
@@ -251,20 +322,129 @@ const loadHighlights = async () => {
   }
 };
 
-onMounted(loadHighlights);
+const requestViewportFullscreen = async () => {
+  if (typeof document === "undefined") {
+    return;
+  }
+  const element = document.documentElement as HTMLElement & {
+    webkitRequestFullscreen?: () => Promise<void> | void;
+    msRequestFullscreen?: () => Promise<void> | void;
+  };
+  if (element.requestFullscreen) {
+    await element.requestFullscreen();
+    return;
+  }
+  if (element.webkitRequestFullscreen) {
+    element.webkitRequestFullscreen();
+    return;
+  }
+  if (element.msRequestFullscreen) {
+    element.msRequestFullscreen();
+  }
+};
+
+const exitDocumentFullscreen = async () => {
+  if (typeof document === "undefined") {
+    return;
+  }
+  const fullDoc = document as Document & {
+    webkitExitFullscreen?: () => Promise<void> | void;
+    msExitFullscreen?: () => Promise<void> | void;
+  };
+  if (fullDoc.exitFullscreen) {
+    await fullDoc.exitFullscreen();
+    return;
+  }
+  if (fullDoc.webkitExitFullscreen) {
+    fullDoc.webkitExitFullscreen();
+    return;
+  }
+  if (fullDoc.msExitFullscreen) {
+    fullDoc.msExitFullscreen();
+  }
+};
+
+const getFullscreenElement = () => {
+  if (typeof document === "undefined") {
+    return null;
+  }
+  const fullDoc = document as Document & {
+    webkitFullscreenElement?: Element | null;
+    msFullscreenElement?: Element | null;
+  };
+  return (
+    fullDoc.fullscreenElement ??
+    fullDoc.webkitFullscreenElement ??
+    fullDoc.msFullscreenElement ??
+    null
+  );
+};
+
+const handleFullscreenChange = () => {
+  if (!getFullscreenElement()) {
+    fullscreenCarouselActive.value = false;
+  }
+};
+
+const enterFullscreenCarousel = async () => {
+  if (!visibleHighlights.value.length) {
+    ElMessage.info("暂无可播放的精选图片");
+    return;
+  }
+  try {
+    if (!getFullscreenElement()) {
+      await requestViewportFullscreen();
+    }
+    fullscreenCarouselActive.value = true;
+  } catch (error) {
+    fullscreenCarouselActive.value = true;
+    console.warn("Failed to enter fullscreen", error);
+    ElMessage.warning("浏览器阻止了全屏请求，但您仍可手动退出");
+  }
+};
+
+const exitFullscreenCarousel = async () => {
+  fullscreenCarouselActive.value = false;
+  if (getFullscreenElement()) {
+    await exitDocumentFullscreen();
+  }
+};
+
+onMounted(() => {
+  loadHighlights();
+  if (typeof document !== "undefined") {
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener(
+      "webkitfullscreenchange",
+      handleFullscreenChange as EventListener
+    );
+    document.addEventListener(
+      "msfullscreenchange",
+      handleFullscreenChange as EventListener
+    );
+  }
+});
 
 const goToUpload = () => {
   router.push({ name: "image-upload" });
 };
 
-const refreshHighlights = () => {
-  if (!highlightsLoading.value) {
-    loadHighlights();
-  }
-};
-
 onUnmounted(() => {
   revokePreviewUrls();
+  if (typeof document !== "undefined") {
+    document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    document.removeEventListener(
+      "webkitfullscreenchange",
+      handleFullscreenChange as EventListener
+    );
+    document.removeEventListener(
+      "msfullscreenchange",
+      handleFullscreenChange as EventListener
+    );
+  }
+  if (fullscreenCarouselActive.value && getFullscreenElement()) {
+    exitDocumentFullscreen();
+  }
 });
 
 const backgroundStyle = (image: HighlightItem) => ({
@@ -272,6 +452,9 @@ const backgroundStyle = (image: HighlightItem) => ({
     image.previewUrl || image.filePath
   })`,
 });
+
+const previewSource = (image: HighlightItem) =>
+  image.previewUrl || image.filePath || "";
 
 const formatResolution = (image: ImageSearchResult) => {
   if (image.width && image.height) {
@@ -502,44 +685,118 @@ watch(highlightPool, syncManualSelection);
   color: #4a5568;
 }
 
+:deep(.manage-dialog) {
+  width: min(980px, 94vw);
+}
+
+:deep(.manage-dialog .el-dialog__body) {
+  padding: 18px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
 .selection-toolbar {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+  width: 100%;
 }
 
-.selection-grid {
+.selection-toolbar :deep(.el-input) {
+  flex: 1;
+  min-width: 260px;
+}
+
+.selection-toolbar :deep(.el-button) {
+  align-self: stretch;
+}
+
+.selection-grid-panel {
+  flex: 1;
+  min-height: 380px;
+  width: 100%;
+  margin-top: 12px;
+}
+
+.selection-grid__group {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 12px;
-  max-height: 420px;
-  overflow-y: auto;
-  padding: 4px;
+  width: 100%;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 220px));
+  gap: 18px;
+  justify-content: flex-start;
+  margin: 0 auto;
 }
 
 .selection-item {
   width: 100%;
+  margin: 0;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.selection-item :deep(.el-checkbox__input) {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+}
+
+.selection-item :deep(.el-checkbox__inner) {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  background-color: rgba(7, 12, 26, 0.6);
 }
 
 .selection-item :deep(.el-checkbox__label) {
   width: 100%;
   padding: 0;
+  display: block;
 }
 
 .selection-thumb {
   position: relative;
-  height: 120px;
+  width: 100%;
+  max-width: 220px;
+  margin: 0;
+  aspect-ratio: 4 / 3;
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  background-size: cover;
-  background-position: center;
-  padding: 12px;
-  color: #fff;
+  overflow: hidden;
+  background: #090c17;
+  box-shadow: 0 6px 20px rgba(9, 12, 23, 0.35);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.selection-thumb__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.selection-thumb__overlay {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  backdrop-filter: blur(3px);
+  padding: 12px;
+  background: linear-gradient(
+    180deg,
+    rgba(4, 6, 12, 0) 35%,
+    rgba(4, 6, 12, 0.85)
+  );
+  color: #fff;
+  pointer-events: none;
 }
 
 .selection-name {
@@ -549,6 +806,19 @@ watch(highlightPool, syncManualSelection);
 
 .selection-meta {
   opacity: 0.85;
+}
+
+:deep(.selection-item.is-checked .selection-thumb) {
+  box-shadow: 0 8px 24px rgba(12, 38, 92, 0.45),
+    0 0 0 3px rgba(59, 130, 246, 0.8);
+}
+
+:deep(.selection-item.is-checked .selection-thumb__overlay) {
+  background: linear-gradient(
+    180deg,
+    rgba(3, 16, 40, 0) 40%,
+    rgba(20, 92, 255, 0.88)
+  );
 }
 
 .dialog-footer {
@@ -565,5 +835,60 @@ watch(highlightPool, syncManualSelection);
 .footer-actions {
   display: flex;
   gap: 12px;
+}
+
+.fullscreen-carousel {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at top, rgba(6, 11, 25, 0.85), #050507);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(2px);
+}
+
+.fullscreen-carousel__controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 32px;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.controls-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.fullscreen-carousel__player {
+  flex: 1;
+  padding: 0 32px 32px;
+  display: flex;
+  min-height: 0;
+}
+
+.fullscreen-carousel__player :deep(.el-carousel) {
+  flex: 1;
+}
+
+.fullscreen-carousel__player :deep(.el-carousel__container) {
+  height: 100%;
+  min-height: 360px;
+  border-radius: 28px;
+  overflow: hidden;
+}
+
+.fullscreen-slide {
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.fullscreen-slide .slide-overlay {
+  padding: 24px 32px;
 }
 </style>
