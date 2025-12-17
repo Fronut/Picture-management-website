@@ -13,18 +13,20 @@
           </template>
 
           <el-form label-position="top" :model="filters" class="filter-form">
-            <el-form-item label="关键词">
+            <el-form-item label="关键词" prop="keyword">
               <el-input
                 v-model="localFilters.keyword"
+                input-id="search-keyword"
                 placeholder="输入文件名或描述关键字"
                 clearable
               />
             </el-form-item>
 
-            <el-form-item label="AI 自然语言检索">
+            <el-form-item label="AI 自然语言检索" prop="aiQuery">
               <div class="ai-search-row">
                 <el-input
                   v-model="aiQuery"
+                  input-id="ai-search-input"
                   placeholder="例如：黄昏海滩 4K 人像"
                   clearable
                   @keyup.enter="handleAiInterpret"
@@ -53,9 +55,10 @@
               </el-link>
             </el-form-item>
 
-            <el-form-item label="标签">
+            <el-form-item label="标签" prop="tags">
               <el-select
                 v-model="localFilters.tags"
+                id="search-tags"
                 multiple
                 filterable
                 allow-create
@@ -64,31 +67,35 @@
               />
             </el-form-item>
 
-            <el-form-item label="拍摄设备">
+            <el-form-item label="拍摄设备" prop="camera">
               <el-input
                 v-model="localFilters.cameraMake"
+                input-id="search-camera-make"
                 placeholder="品牌，如 Canon"
                 clearable
                 class="inline-input"
               />
               <el-input
                 v-model="localFilters.cameraModel"
+                input-id="search-camera-model"
                 placeholder="型号，如 EOS R7"
                 clearable
                 class="inline-input"
               />
             </el-form-item>
 
-            <el-form-item label="分辨率范围 (px)">
+            <el-form-item label="分辨率范围 (px)" prop="resolution">
               <div class="range-inputs">
                 <el-input-number
                   v-model="localFilters.minWidth"
+                  id="search-min-width"
                   :min="1"
                   placeholder="最小宽"
                 />
                 <span>~</span>
                 <el-input-number
                   v-model="localFilters.maxWidth"
+                  id="search-max-width"
                   :min="1"
                   placeholder="最大宽"
                 />
@@ -96,21 +103,24 @@
               <div class="range-inputs">
                 <el-input-number
                   v-model="localFilters.minHeight"
+                  id="search-min-height"
                   :min="1"
                   placeholder="最小高"
                 />
                 <span>~</span>
                 <el-input-number
                   v-model="localFilters.maxHeight"
+                  id="search-max-height"
                   :min="1"
                   placeholder="最大高"
                 />
               </div>
             </el-form-item>
 
-            <el-form-item label="时间区间">
+            <el-form-item label="时间区间" prop="dateRange">
               <el-date-picker
                 v-model="dateRange"
+                id="search-date-range"
                 type="datetimerange"
                 start-placeholder="开始时间"
                 end-placeholder="结束时间"
@@ -123,17 +133,21 @@
               />
             </el-form-item>
 
-            <el-form-item label="隐私">
-              <el-radio-group v-model="localFilters.privacyLevel">
+            <div class="form-block">
+              <label class="form-block__label" aria-label="隐私">隐私</label>
+              <el-radio-group
+                v-model="localFilters.privacyLevel"
+                id="search-privacy"
+              >
                 <el-radio-button label="PUBLIC"> 公开 </el-radio-button>
                 <el-radio-button label="PRIVATE"> 私有 </el-radio-button>
                 <!-- use explicit ALL token and convert to undefined in request normalization -->
                 <el-radio-button label="ALL"> 全部 </el-radio-button>
               </el-radio-group>
-            </el-form-item>
+            </div>
 
-            <el-form-item>
-              <el-checkbox v-model="localFilters.onlyOwn">
+            <el-form-item prop="onlyOwn">
+              <el-checkbox v-model="localFilters.onlyOwn" id="search-only-own">
                 仅查看我的图片
               </el-checkbox>
             </el-form-item>
@@ -822,6 +836,17 @@ watch(editDialogVisible, (visible) => {
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+}
+
+.form-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-block__label {
+  font-size: 14px;
+  color: #606266;
 }
 
 .result-info {

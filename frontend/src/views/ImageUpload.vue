@@ -46,15 +46,17 @@
           </el-upload>
 
           <el-form label-width="80px" class="upload-form">
-            <el-form-item label="隐私">
-              <el-radio-group v-model="privacyLevel">
+            <div class="form-block">
+              <label class="form-block__label" aria-label="隐私">隐私</label>
+              <el-radio-group v-model="privacyLevel" id="upload-privacy">
                 <el-radio-button label="PRIVATE">私有</el-radio-button>
                 <el-radio-button label="PUBLIC">公开</el-radio-button>
               </el-radio-group>
-            </el-form-item>
-            <el-form-item label="描述">
+            </div>
+            <el-form-item label="描述" prop="description">
               <el-input
                 v-model="description"
+                input-id="upload-description"
                 type="textarea"
                 :rows="3"
                 placeholder="为本次上传添加描述（可选）"
@@ -361,6 +363,17 @@ const formatTimestamp = (value: string) => {
   color: #f56c6c;
   font-size: 12px;
   margin-top: 4px;
+}
+
+.form-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-block__label {
+  font-size: 14px;
+  color: #606266;
 }
 
 .actions {
