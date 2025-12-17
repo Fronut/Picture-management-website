@@ -12,3 +12,7 @@ Zhejiang University 2025 B/S Course Project
 
 - The `tools/mcp-image-search` folder contains a standalone Model Context Protocol server that exposes the photo search endpoints to LLM clients (e.g., Claude Desktop).
 - Configure it with `PICTURE_API_BASE_URL`, `PICTURE_AI_BASE_URL`, and `PICTURE_API_TOKEN`, then register the `search_images` tool inside your MCP-compatible client to let models retrieve photos through natural dialogue.
+
+## Documentation
+
+- See [docs/README.md](docs/README.md) for full backend/frontend/AI-service documentation, setup, and run instructions.
