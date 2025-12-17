@@ -1,11 +1,13 @@
 # 后端（Spring Boot）
 
 ## 概览
+
 - 技术栈：Spring Boot 3 / Java 17、Spring Security + JWT、Spring Data JPA、Flyway、Redis Cache、RestTemplate。
 - 主要职责：用户认证、图片上传/存储、EXIF 提取、缩略图生成、标签管理、AI 交互代理、搜索与权限控制。
 - 入口与配置：`application.yml` 多 profile（`dev`/`docker`/`prod`）；文件路径、AI 服务地址、Redis/DB 连接均可通过环境变量覆盖。
 
 ## 目录与关键类
+
 - 配置
   - [backend/src/main/resources/application.yml](backend/src/main/resources/application.yml)（含 dev/docker/prod）
   - [backend/src/main/java/com/imagemanagement/config/SecurityConfig.java](backend/src/main/java/com/imagemanagement/config/SecurityConfig.java)（JWT 过滤器、CORS、放行路径）
@@ -29,6 +31,7 @@
   - 迁移脚本位于 [backend/src/main/resources/db/migration](backend/src/main/resources/db/migration)
 
 ## 核心流程
+
 - 认证
   - 注册/登录返回 JWT + 刷新令牌；刷新令牌记录于 Redis（或内存）并可注销。
   - `SecurityConfig` 放行 `/api/auth/**`、健康检查、公开缩略图/高光列表；其余需 Bearer Token。
@@ -46,6 +49,7 @@
   - `/api/ai/chat` 将用户输入转发到 AI 服务（Deepseek 工具调用），支持生成搜索条件或匹配结果。
 
 ## 配置要点
+
 - 文件路径：默认 `/app/uploads` 和 `/app/thumbnails`，可通过 `UPLOAD_DIR` / `THUMBNAIL_DIR` 覆盖。
 - 数据源：`spring.datasource.*` 来自 profile 环境变量；Flyway 启用。
 - Redis：缓存注解用于用户/图片/搜索；缺省连接 `localhost:6379`。
@@ -53,6 +57,7 @@
 - JWT：`jwt.secret`、过期时间、刷新令牌过期在 `application.yml`。
 
 ## API 速览（主要路径）
+
 - 认证
   - `POST /api/auth/register`、`POST /api/auth/login`、`POST /api/auth/refresh`、`POST /api/auth/logout`
 - 图片
@@ -69,6 +74,7 @@
   - `POST /api/ai/chat`（代理 AI 服务）
 
 ## 数据模型
+
 - `users`：用户名/邮箱/密码（bcrypt）/角色
 - `images`：owner、文件名、描述、路径、尺寸、mime、隐私、hash、上传时间
 - `exif_data`：相机、曝光、光圈、ISO、焦距、拍摄时间、位置
@@ -77,15 +83,18 @@
 - `refresh_tokens`：用户刷新令牌、状态、过期时间
 
 ## 缓存与权限
+
 - 缓存：Redis CacheManager；常用缓存域覆盖用户/图片/搜索结果。
 - 权限：`ImageContentService` 校验访问者是否 owner 或公开图片；缩略图/原图下载同样检查。
 - CORS：默认允许常见方法/headers，可在 `application.yml` 或 `SecurityConfig` 调整。
 
 ## 开发与调试
+
 - 运行：`cd backend && ./mvnw spring-boot:run`
 - 代码风格：Java 17，避免写死 OS 路径；使用 `FileStorageProperties` 配置。
 - 日志：默认 INFO；可通过 `logging.level.*` 配置。
 
 ## 测试
+
 - 单元/集成：`./mvnw test`
 - 预置数据：如需本地初始化，可在 `docker/mysql/init.sql` 或自建 migration 中添加。

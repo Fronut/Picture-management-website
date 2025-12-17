@@ -1,11 +1,13 @@
 # 前端（Vue 3 + Vite）
 
 ## 概览
+
 - 技术栈：Vue 3 + TypeScript、Vite、Pinia、Vue Router、Element Plus。
 - 主要职责：认证、图片上传/搜索/详情/标签管理、AI 对话检索、轮播高光展示。
 - 开发命令：`cd frontend && npm install && npm run dev`；质量：`npm run lint`。
 
 ## 目录速览
+
 - 入口与布局
   - [frontend/src/main.ts](frontend/src/main.ts)：应用创建、Element Plus 注册、Pinia/Router 挂载。
   - [frontend/src/App.vue](frontend/src/App.vue)：主框架，包含侧栏、头部与 `<router-view>`。
@@ -26,6 +28,7 @@
 - 类型定义：位于 [frontend/src/types](frontend/src/types)
 
 ## 主要页面/组件
+
 - 仪表盘高光：[frontend/src/views/DashboardHome.vue](frontend/src/views/DashboardHome.vue)
   - 展示最近高光轮播、手动选择展示池、全屏播放。
 - 批量上传：[frontend/src/views/ImageUpload.vue](frontend/src/views/ImageUpload.vue)
@@ -44,10 +47,12 @@
   - 标签管理抽屉：[frontend/src/components/ImageTagManagerPanel.vue](frontend/src/components/ImageTagManagerPanel.vue)
 
 ## 路由与鉴权
+
 - 受保护路由统一在 `beforeEach` 中检查 `authStore.isAuthenticated`，未登录重定向至 `/auth/login`，并附带 redirect query。
 - `/auth/login` 与 `/auth/register` 对已登录用户自动跳转至 `/dashboard`。
 
 ## 交互要点
+
 - 上传：队列去重、状态标签、错误提示；上传结果可跳转详情或标签管理。
 - 搜索：AI 解析（Deepseek）可填充 filters；结果卡片显示分辨率/大小/时间/标签，支持编辑/删除；下载缩略图采用懒加载与 object URL 管理避免内存泄漏。
 - 详情：下载原图/缩略图需权限；编辑完成后同步更新详情和预览；标签抽屉实时更新。
@@ -55,10 +60,12 @@
 - 高光：本地存储记忆手动选择；可全屏播放轮播。
 
 ## 构建与质量
+
 - 开发：`npm run dev`
 - 生产构建：`npm run build`
 - 代码质量：`npm run lint`（当前需修复 lint 报错后再通过）
 
 ## 对接后端
+
 - 所有 API 基础地址来自 `VITE_API_BASE_URL`（在 `.env`/`.env.*` 配置）。
 - 401 统一在 axios 拦截器处处理并清理登录态。
