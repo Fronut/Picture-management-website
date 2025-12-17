@@ -116,8 +116,6 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  margin-left: var(--sidebar-width);
-  transition: margin-left 0.2s ease;
 }
 
 .is-mobile .app-body {

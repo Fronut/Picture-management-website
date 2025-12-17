@@ -120,7 +120,6 @@
             <el-form-item label="时间区间" prop="dateRange">
               <el-date-picker
                 v-model="dateRange"
-                id="search-date-range"
                 type="datetimerange"
                 start-placeholder="开始时间"
                 end-placeholder="结束时间"
