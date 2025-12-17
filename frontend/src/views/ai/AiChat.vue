@@ -40,7 +40,12 @@
                   {{ message.role === "user" ? "你" : "Deepseek" }}
                 </span>
               </div>
-              <p class="message-content">{{ message.content }}</p>
+              <div
+                v-if="message.role === 'assistant'"
+                class="message-content markdown"
+                v-html="renderMarkdown(message.content)"
+              ></div>
+              <p v-else class="message-content">{{ message.content }}</p>
               <div v-if="message.toolCalls?.length" class="inline-tools">
                 <p class="tool-title">调用的函数</p>
                 <el-timeline>
@@ -232,6 +237,8 @@ import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import dayjs from "dayjs";
 import { ElMessage } from "element-plus";
+import MarkdownIt from "markdown-it";
+import DOMPurify from "dompurify";
 
 import { chatSearchImages } from "@/services/aiService";
 import type { AiChatMessage, AiChatSearchResult, AiToolCall } from "@/types/ai";
@@ -280,6 +287,17 @@ const formatResolution = (image: ImageSearchResult) => {
 
 const goToDetail = (imageId: number) => {
   router.push({ name: "image-detail", params: { imageId } });
+};
+
+const markdown = new MarkdownIt({
+  html: false,
+  linkify: true,
+  breaks: true,
+});
+
+const renderMarkdown = (content: string) => {
+  const rawHtml = markdown.render(content);
+  return DOMPurify.sanitize(rawHtml);
 };
 
 const formatArguments = (args?: string) => {
@@ -481,6 +499,47 @@ const resetConversation = () => {
 .message-content {
   margin: 0;
   line-height: 1.6;
+}
+
+.message-content.markdown {
+  color: rgba(0, 0, 0, 0.85);
+  white-space: normal;
+}
+
+.message-content.markdown :where(p, ul, ol, pre, blockquote) {
+  margin: 0 0 8px;
+}
+
+.message-content.markdown ul,
+.message-content.markdown ol {
+  padding-left: 18px;
+}
+
+.message-content.markdown code {
+  background: #f2f4f8;
+  border-radius: 4px;
+  padding: 0 4px;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+}
+
+.message-content.markdown pre {
+  background: #1e1e1e;
+  color: #f8f8f2;
+  padding: 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.message-content.markdown pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.message-content.markdown a {
+  color: #409eff;
+  text-decoration: underline;
 }
 
 .inline-tools {
