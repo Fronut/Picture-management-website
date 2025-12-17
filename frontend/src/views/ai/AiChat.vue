@@ -40,12 +40,16 @@
                   {{ message.role === "user" ? "你" : "Deepseek" }}
                 </span>
               </div>
+              <!-- eslint-disable vue/no-v-html -->
               <div
                 v-if="message.role === 'assistant'"
                 class="message-content markdown"
                 v-html="renderMarkdown(message.content)"
-              ></div>
-              <p v-else class="message-content">{{ message.content }}</p>
+              />
+              <!-- eslint-enable vue/no-v-html -->
+              <p v-else class="message-content">
+                {{ message.content }}
+              </p>
               <div v-if="message.toolCalls?.length" class="inline-tools">
                 <p class="tool-title">调用的函数</p>
                 <el-timeline>
@@ -84,7 +88,7 @@
               <el-button type="primary" :loading="sending" @click="sendMessage">
                 发送
               </el-button>
-              <el-button text @click="resetConversation">清空</el-button>
+              <el-button text @click="resetConversation"> 清空 </el-button>
             </div>
           </div>
         </el-card>
@@ -146,11 +150,11 @@
             <section v-if="primaryResult" class="payload-section">
               <h4>解析出的搜索条件</h4>
               <div class="payload-grid">
-                <div class="payload-item" v-if="searchPayload.keyword">
+                <div v-if="searchPayload.keyword" class="payload-item">
                   <span class="label">关键词</span>
                   <strong>{{ searchPayload.keyword }}</strong>
                 </div>
-                <div class="payload-item" v-if="searchPayload.tags?.length">
+                <div v-if="searchPayload.tags?.length" class="payload-item">
                   <span class="label">标签</span>
                   <el-space wrap>
                     <el-tag
@@ -162,23 +166,23 @@
                     </el-tag>
                   </el-space>
                 </div>
-                <div class="payload-item" v-if="searchPayload.onlyOwn">
+                <div v-if="searchPayload.onlyOwn" class="payload-item">
                   <span class="label">仅看我的图片</span>
                   <strong>已启用</strong>
                 </div>
                 <div
-                  class="payload-item"
                   v-if="
                     searchPayload.privacyLevel &&
                     searchPayload.privacyLevel !== 'ALL'
                   "
+                  class="payload-item"
                 >
                   <span class="label">隐私</span>
                   <strong>{{ searchPayload.privacyLevel }}</strong>
                 </div>
                 <div
-                  class="payload-item"
                   v-if="searchPayload.uploadedFrom && searchPayload.uploadedTo"
+                  class="payload-item"
                 >
                   <span class="label">时间</span>
                   <strong
@@ -198,7 +202,9 @@
                   shadow="hover"
                   class="match-card"
                 >
-                  <div class="match-title">{{ image.originalFilename }}</div>
+                  <div class="match-title">
+                    {{ image.originalFilename }}
+                  </div>
                   <p class="match-desc">
                     {{ image.description || "暂无描述" }}
                   </p>

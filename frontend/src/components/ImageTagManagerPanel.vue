@@ -10,18 +10,40 @@
       <div class="drawer-header">
         <div>
           <h3>管理标签</h3>
-          <p v-if="imageId" class="subtitle">针对图片 #{{ imageId }}</p>
-          <p v-else class="subtitle">请选择有效的图片即可管理标签</p>
+          <p
+            v-if="imageId"
+            class="subtitle"
+          >
+            针对图片 #{{ imageId }}
+          </p>
+          <p
+            v-else
+            class="subtitle"
+          >
+            请选择有效的图片即可管理标签
+          </p>
         </div>
       </div>
     </template>
 
-    <el-empty v-if="!imageId" description="请先在图片详情中选择有效图片" />
+    <el-empty
+      v-if="!imageId"
+      description="请先在图片详情中选择有效图片"
+    />
 
-    <div v-else class="drawer-content">
+    <div
+      v-else
+      class="drawer-content"
+    >
       <el-row :gutter="16">
-        <el-col :md="16" :xs="24">
-          <el-card shadow="never" class="tag-list-card">
+        <el-col
+          :md="16"
+          :xs="24"
+        >
+          <el-card
+            shadow="never"
+            class="tag-list-card"
+          >
             <template #header>
               <div class="card-header">
                 <div>
@@ -45,26 +67,47 @@
               v-if="!tags.length && !isLoading"
               description="暂无标签"
             />
-            <el-table v-else v-loading="isLoading" :data="tags" size="small">
-              <el-table-column label="标签名" prop="tagName" min-width="150" />
-              <el-table-column label="类型" width="120">
+            <el-table
+              v-else
+              v-loading="isLoading"
+              :data="tags"
+              size="small"
+            >
+              <el-table-column
+                label="标签名"
+                prop="tagName"
+                min-width="150"
+              />
+              <el-table-column
+                label="类型"
+                width="120"
+              >
                 <template #default="{ row }">
                   <el-tag :type="tagTypeColor(row.tagType)">
                     {{ formatTagType(row.tagType) }}
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="可信度" width="130">
+              <el-table-column
+                label="可信度"
+                width="130"
+              >
                 <template #default="{ row }">
                   {{ formatConfidence(row.confidence) }}
                 </template>
               </el-table-column>
-              <el-table-column label="使用次数" width="120">
+              <el-table-column
+                label="使用次数"
+                width="120"
+              >
                 <template #default="{ row }">
                   {{ row.usageCount ?? 0 }}
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="120">
+              <el-table-column
+                label="操作"
+                width="120"
+              >
                 <template #default="{ row }">
                   <el-button
                     text
@@ -81,7 +124,10 @@
           </el-card>
         </el-col>
 
-        <el-col :md="8" :xs="24">
+        <el-col
+          :md="8"
+          :xs="24"
+        >
           <el-card
             v-loading="popularLoading"
             shadow="never"
@@ -91,15 +137,27 @@
               <div class="card-header">
                 <div>
                   <h4>热门标签</h4>
-                  <p class="card-subtitle">点击即可快速添加到自定义列表</p>
+                  <p class="card-subtitle">
+                    点击即可快速添加到自定义列表
+                  </p>
                 </div>
-                <el-button text size="small" @click="refreshPopular">
+                <el-button
+                  text
+                  size="small"
+                  @click="refreshPopular"
+                >
                   刷新
                 </el-button>
               </div>
             </template>
-            <el-empty v-if="!popularTags.length" description="暂无热门标签" />
-            <el-space v-else wrap>
+            <el-empty
+              v-if="!popularTags.length"
+              description="暂无热门标签"
+            />
+            <el-space
+              v-else
+              wrap
+            >
               <el-tag
                 v-for="tag in popularTags"
                 :key="tag.tagId"
@@ -113,8 +171,14 @@
         </el-col>
       </el-row>
 
-      <el-row :gutter="16" class="form-row">
-        <el-col :md="14" :xs="24">
+      <el-row
+        :gutter="16"
+        class="form-row"
+      >
+        <el-col
+          :md="14"
+          :xs="24"
+        >
           <el-card shadow="never">
             <template #header>
               <div class="card-header">
@@ -147,9 +211,18 @@
                     :value="tag.tagName"
                   />
                 </el-select>
-                <el-select v-model="draft.tagType" class="type-select">
-                  <el-option label="自定义" value="CUSTOM" />
-                  <el-option label="AI 生成" value="AI" />
+                <el-select
+                  v-model="draft.tagType"
+                  class="type-select"
+                >
+                  <el-option
+                    label="自定义"
+                    value="CUSTOM"
+                  />
+                  <el-option
+                    label="AI 生成"
+                    value="AI"
+                  />
                 </el-select>
                 <el-input-number
                   v-model="draft.confidence"
@@ -170,7 +243,11 @@
                   删除
                 </el-button>
               </div>
-              <el-button text type="primary" @click="addDraftRow">
+              <el-button
+                text
+                type="primary"
+                @click="addDraftRow"
+              >
                 新增行
               </el-button>
             </div>
@@ -184,13 +261,18 @@
           </el-card>
         </el-col>
 
-        <el-col :md="10" :xs="24">
+        <el-col
+          :md="10"
+          :xs="24"
+        >
           <el-card shadow="never">
             <template #header>
               <div class="card-header">
                 <div>
                   <h4>让 AI 协助</h4>
-                  <p class="card-subtitle">输入提示词，自动生成一组标签</p>
+                  <p class="card-subtitle">
+                    输入提示词，自动生成一组标签
+                  </p>
                 </div>
               </div>
             </template>

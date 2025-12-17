@@ -1,19 +1,36 @@
 <template>
   <section class="image-search">
     <el-row :gutter="24">
-      <el-col :xs="24" :lg="8">
-        <el-card shadow="never" class="filter-card">
+      <el-col
+        :xs="24"
+        :lg="8"
+      >
+        <el-card
+          shadow="never"
+          class="filter-card"
+        >
           <template #header>
             <div class="card-header">
               <h3>搜索条件</h3>
-              <el-button text size="small" @click="handleResetFilters">
+              <el-button
+                text
+                size="small"
+                @click="handleResetFilters"
+              >
                 重置
               </el-button>
             </div>
           </template>
 
-          <el-form label-position="top" :model="filters" class="filter-form">
-            <el-form-item label="关键词" prop="keyword">
+          <el-form
+            label-position="top"
+            :model="filters"
+            class="filter-form"
+          >
+            <el-form-item
+              label="关键词"
+              prop="keyword"
+            >
               <el-input
                 v-model="localFilters.keyword"
                 input-id="search-keyword"
@@ -22,7 +39,10 @@
               />
             </el-form-item>
 
-            <el-form-item label="AI 自然语言检索" prop="aiQuery">
+            <el-form-item
+              label="AI 自然语言检索"
+              prop="aiQuery"
+            >
               <div class="ai-search-row">
                 <el-input
                   v-model="aiQuery"
@@ -50,15 +70,22 @@
                 show-icon
                 class="ai-summary"
               />
-              <el-link type="primary" :underline="false" @click="goAiChat">
+              <el-link
+                type="primary"
+                :underline="false"
+                @click="goAiChat"
+              >
                 打开完整对话模式
               </el-link>
             </el-form-item>
 
-            <el-form-item label="标签" prop="tags">
+            <el-form-item
+              label="标签"
+              prop="tags"
+            >
               <el-select
-                v-model="localFilters.tags"
                 id="search-tags"
+                v-model="localFilters.tags"
                 multiple
                 filterable
                 allow-create
@@ -67,7 +94,10 @@
               />
             </el-form-item>
 
-            <el-form-item label="拍摄设备" prop="camera">
+            <el-form-item
+              label="拍摄设备"
+              prop="camera"
+            >
               <el-input
                 v-model="localFilters.cameraMake"
                 input-id="search-camera-make"
@@ -84,40 +114,46 @@
               />
             </el-form-item>
 
-            <el-form-item label="分辨率范围 (px)" prop="resolution">
+            <el-form-item
+              label="分辨率范围 (px)"
+              prop="resolution"
+            >
               <div class="range-inputs">
                 <el-input-number
-                  v-model="localFilters.minWidth"
                   id="search-min-width"
+                  v-model="localFilters.minWidth"
                   :min="1"
                   placeholder="最小宽"
                 />
                 <span>~</span>
                 <el-input-number
-                  v-model="localFilters.maxWidth"
                   id="search-max-width"
+                  v-model="localFilters.maxWidth"
                   :min="1"
                   placeholder="最大宽"
                 />
               </div>
               <div class="range-inputs">
                 <el-input-number
-                  v-model="localFilters.minHeight"
                   id="search-min-height"
+                  v-model="localFilters.minHeight"
                   :min="1"
                   placeholder="最小高"
                 />
                 <span>~</span>
                 <el-input-number
-                  v-model="localFilters.maxHeight"
                   id="search-max-height"
+                  v-model="localFilters.maxHeight"
                   :min="1"
                   placeholder="最大高"
                 />
               </div>
             </el-form-item>
 
-            <el-form-item label="时间区间" prop="dateRange">
+            <el-form-item
+              label="时间区间"
+              prop="dateRange"
+            >
               <el-date-picker
                 v-model="dateRange"
                 type="datetimerange"
@@ -133,20 +169,32 @@
             </el-form-item>
 
             <div class="form-block">
-              <label class="form-block__label" aria-label="隐私">隐私</label>
+              <label
+                class="form-block__label"
+                aria-label="隐私"
+              >隐私</label>
               <el-radio-group
-                v-model="localFilters.privacyLevel"
                 id="search-privacy"
+                v-model="localFilters.privacyLevel"
               >
-                <el-radio-button label="PUBLIC"> 公开 </el-radio-button>
-                <el-radio-button label="PRIVATE"> 私有 </el-radio-button>
+                <el-radio-button label="PUBLIC">
+                  公开
+                </el-radio-button>
+                <el-radio-button label="PRIVATE">
+                  私有
+                </el-radio-button>
                 <!-- use explicit ALL token and convert to undefined in request normalization -->
-                <el-radio-button label="ALL"> 全部 </el-radio-button>
+                <el-radio-button label="ALL">
+                  全部
+                </el-radio-button>
               </el-radio-group>
             </div>
 
             <el-form-item prop="onlyOwn">
-              <el-checkbox v-model="localFilters.onlyOwn" id="search-only-own">
+              <el-checkbox
+                id="search-only-own"
+                v-model="localFilters.onlyOwn"
+              >
                 仅查看我的图片
               </el-checkbox>
             </el-form-item>
@@ -163,8 +211,14 @@
         </el-card>
       </el-col>
 
-      <el-col :xs="24" :lg="16">
-        <el-card shadow="never" class="result-card">
+      <el-col
+        :xs="24"
+        :lg="16"
+      >
+        <el-card
+          shadow="never"
+          class="result-card"
+        >
           <template #header>
             <div class="card-header">
               <div>
@@ -178,21 +232,49 @@
                 size="small"
                 @change="handleSortChange"
               >
-                <el-option label="最新上传" value="uploadTime|DESC" />
-                <el-option label="最早上传" value="uploadTime|ASC" />
-                <el-option label="文件名 A-Z" value="originalFilename|ASC" />
-                <el-option label="文件名 Z-A" value="originalFilename|DESC" />
-                <el-option label="文件体积从大到小" value="fileSize|DESC" />
-                <el-option label="文件体积从小到大" value="fileSize|ASC" />
+                <el-option
+                  label="最新上传"
+                  value="uploadTime|DESC"
+                />
+                <el-option
+                  label="最早上传"
+                  value="uploadTime|ASC"
+                />
+                <el-option
+                  label="文件名 A-Z"
+                  value="originalFilename|ASC"
+                />
+                <el-option
+                  label="文件名 Z-A"
+                  value="originalFilename|DESC"
+                />
+                <el-option
+                  label="文件体积从大到小"
+                  value="fileSize|DESC"
+                />
+                <el-option
+                  label="文件体积从小到大"
+                  value="fileSize|ASC"
+                />
               </el-select>
             </div>
           </template>
 
-          <el-skeleton v-if="loading" :rows="6" animated />
+          <el-skeleton
+            v-if="loading"
+            :rows="6"
+            animated
+          />
 
-          <el-empty v-else-if="!hasResults" description="暂未找到匹配图片" />
+          <el-empty
+            v-else-if="!hasResults"
+            description="暂未找到匹配图片"
+          />
 
-          <div v-else class="result-grid">
+          <div
+            v-else
+            class="result-grid"
+          >
             <el-row :gutter="16">
               <el-col
                 v-for="image in results"
@@ -200,15 +282,21 @@
                 :xs="24"
                 :md="12"
               >
-                <el-card shadow="hover" class="image-card">
+                <el-card
+                  shadow="hover"
+                  class="image-card"
+                >
                   <div class="image-cover">
                     <img
                       :src="thumbnailUrl(image)"
                       :alt="image.originalFilename"
-                    />
+                    >
                   </div>
                   <div class="image-meta">
-                    <div class="image-title" :title="image.originalFilename">
+                    <div
+                      class="image-title"
+                      :title="image.originalFilename"
+                    >
                       {{ image.originalFilename }}
                     </div>
                     <p class="image-desc">
@@ -274,7 +362,10 @@
             </el-row>
           </div>
 
-          <div v-if="hasResults" class="pagination">
+          <div
+            v-if="hasResults"
+            class="pagination"
+          >
             <el-pagination
               background
               layout="prev, pager, next, sizes, jumper"

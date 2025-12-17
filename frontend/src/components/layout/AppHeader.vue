@@ -8,10 +8,18 @@
     }"
   >
     <div class="sidebar-inner">
-      <div class="branding" @click="goHome">
+      <div
+        class="branding"
+        @click="goHome"
+      >
         <span class="logo">PM</span>
-        <div class="brand-text" v-if="!navCollapsed || isMobile">
-          <p class="app-name">{{ appName }}</p>
+        <div
+          v-if="!navCollapsed || isMobile"
+          class="brand-text"
+        >
+          <p class="app-name">
+            {{ appName }}
+          </p>
           <small class="app-subtitle">Picture Management</small>
         </div>
       </div>
@@ -41,18 +49,37 @@
           :index="item.path"
           @click="navigateTo(item.path)"
         >
-          <component :is="item.icon" class="menu-icon" />
-          <span class="menu-label" v-if="!navCollapsed || isMobile">
+          <component
+            :is="item.icon"
+            class="menu-icon"
+          />
+          <span
+            v-if="!navCollapsed || isMobile"
+            class="menu-label"
+          >
             {{ item.label }}
           </span>
         </el-menu-item>
       </el-menu>
 
-      <div class="sidebar-footer" v-if="isAuthenticated">
-        <div class="user-box" :class="{ centered: navCollapsed && !isMobile }">
-          <div class="avatar-pill">{{ userInitials }}</div>
-          <div class="user-meta" v-if="!navCollapsed || isMobile">
-            <p class="user-name">{{ user?.username }}</p>
+      <div
+        v-if="isAuthenticated"
+        class="sidebar-footer"
+      >
+        <div
+          class="user-box"
+          :class="{ centered: navCollapsed && !isMobile }"
+        >
+          <div class="avatar-pill">
+            {{ userInitials }}
+          </div>
+          <div
+            v-if="!navCollapsed || isMobile"
+            class="user-meta"
+          >
+            <p class="user-name">
+              {{ user?.username }}
+            </p>
             <small class="user-email">{{ user?.email }}</small>
           </div>
         </div>
@@ -67,11 +94,20 @@
         </el-button>
       </div>
 
-      <div v-else class="guest-actions">
-        <el-button type="primary" @click="navigateTo('/auth/login')">
+      <div
+        v-else
+        class="guest-actions"
+      >
+        <el-button
+          type="primary"
+          @click="navigateTo('/auth/login')"
+        >
           登录
         </el-button>
-        <el-button plain @click="navigateTo('/auth/register')">
+        <el-button
+          plain
+          @click="navigateTo('/auth/register')"
+        >
           注册
         </el-button>
       </div>

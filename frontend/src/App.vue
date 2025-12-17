@@ -21,14 +21,19 @@
     />
 
     <div class="app-body">
-      <header class="mobile-topbar" v-if="isMobile">
+      <header
+        v-if="isMobile"
+        class="mobile-topbar"
+      >
         <el-button
           circle
           class="ghost-btn"
           :icon="mobileOpen ? Close : Menu"
           @click="toggleSidebar"
         />
-        <div class="topbar-title">{{ appName }}</div>
+        <div class="topbar-title">
+          {{ appName }}
+        </div>
       </header>
 
       <el-main class="app-main">
@@ -40,7 +45,7 @@
       v-if="isMobile && mobileOpen"
       class="sidebar-backdrop"
       @click="closeMobile"
-    ></div>
+    />
   </el-container>
 </template>
 

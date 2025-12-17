@@ -16,7 +16,7 @@
       class="detail-result"
     >
       <template #extra>
-        <el-button type="primary" @click="fetchDetail">重新加载</el-button>
+        <el-button type="primary" @click="fetchDetail"> 重新加载 </el-button>
       </template>
     </el-result>
 
@@ -69,7 +69,7 @@
       <el-row :gutter="24" class="info-grid">
         <el-col :xs="24" :md="12">
           <el-card shadow="never">
-            <template #header>文件 & 权限</template>
+            <template #header> 文件 & 权限 </template>
             <el-descriptions :column="1" border>
               <el-descriptions-item label="隐私">
                 <el-tag
@@ -107,7 +107,7 @@
         </el-col>
         <el-col :xs="24" :md="12">
           <el-card shadow="never">
-            <template #header>EXIF / 拍摄信息</template>
+            <template #header> EXIF / 拍摄信息 </template>
             <el-descriptions v-if="detail.exif" :column="1" border>
               <el-descriptions-item label="设备">
                 {{ detail.exif?.cameraMake || "-" }}
@@ -195,7 +195,7 @@
         </el-col>
         <el-col :xs="24" :md="12">
           <el-card shadow="never">
-            <template #header>缩略图</template>
+            <template #header> 缩略图 </template>
             <div v-if="summary.thumbnails.length" class="thumb-list">
               <div
                 v-for="thumb in summary.thumbnails"
@@ -333,7 +333,7 @@ const ensurePreview = async (image: ImageSearchResult) => {
     const original = await downloadOriginalImage(image.id);
     rememberObjectUrl(original);
   } catch (error) {
-    console.warn("Failed to load preview", error);
+    // preview generation failed; ignore to keep page usable
   } finally {
     previewLoading.value = false;
   }

@@ -1,8 +1,14 @@
 <template>
   <section class="upload-page">
     <el-row :gutter="24">
-      <el-col :xs="24" :lg="16">
-        <el-card shadow="never" class="upload-card">
+      <el-col
+        :xs="24"
+        :lg="16"
+      >
+        <el-card
+          shadow="never"
+          class="upload-card"
+        >
           <template #header>
             <div class="card-header">
               <div>
@@ -45,15 +51,31 @@
             </template>
           </el-upload>
 
-          <el-form label-width="80px" class="upload-form">
+          <el-form
+            label-width="80px"
+            class="upload-form"
+          >
             <div class="form-block">
-              <label class="form-block__label" aria-label="隐私">隐私</label>
-              <el-radio-group v-model="privacyLevel" id="upload-privacy">
-                <el-radio-button label="PRIVATE">私有</el-radio-button>
-                <el-radio-button label="PUBLIC">公开</el-radio-button>
+              <label
+                class="form-block__label"
+                aria-label="隐私"
+              >隐私</label>
+              <el-radio-group
+                id="upload-privacy"
+                v-model="privacyLevel"
+              >
+                <el-radio-button label="PRIVATE">
+                  私有
+                </el-radio-button>
+                <el-radio-button label="PUBLIC">
+                  公开
+                </el-radio-button>
               </el-radio-group>
             </div>
-            <el-form-item label="描述" prop="description">
+            <el-form-item
+              label="描述"
+              prop="description"
+            >
               <el-input
                 v-model="description"
                 input-id="upload-description"
@@ -79,11 +101,23 @@
               </el-space>
             </div>
 
-            <el-empty v-if="!candidates.length" description="暂无文件" />
+            <el-empty
+              v-if="!candidates.length"
+              description="暂无文件"
+            />
 
-            <div v-else class="candidate-table">
-              <el-table :data="candidates" size="small">
-                <el-table-column label="文件名" min-width="200">
+            <div
+              v-else
+              class="candidate-table"
+            >
+              <el-table
+                :data="candidates"
+                size="small"
+              >
+                <el-table-column
+                  label="文件名"
+                  min-width="200"
+                >
                   <template #default="{ row }">
                     <div class="file-name">
                       {{ row.file.name }}
@@ -94,17 +128,26 @@
                     </small>
                   </template>
                 </el-table-column>
-                <el-table-column label="状态" width="140">
+                <el-table-column
+                  label="状态"
+                  width="140"
+                >
                   <template #default="{ row }">
                     <el-tag :type="statusType(row.status)">
                       {{ statusLabel(row.status) }}
                     </el-tag>
-                    <div v-if="row.errorMessage" class="error-text">
+                    <div
+                      v-if="row.errorMessage"
+                      class="error-text"
+                    >
                       {{ row.errorMessage }}
                     </div>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="120">
+                <el-table-column
+                  label="操作"
+                  width="120"
+                >
                   <template #default="{ row }">
                     <el-button
                       text
@@ -141,22 +184,40 @@
         </el-card>
       </el-col>
 
-      <el-col :xs="24" :lg="8">
-        <el-card shadow="never" class="result-card">
+      <el-col
+        :xs="24"
+        :lg="8"
+      >
+        <el-card
+          shadow="never"
+          class="result-card"
+        >
           <template #header>
             <div class="card-header">
               <h3>上传结果</h3>
             </div>
           </template>
 
-          <el-empty v-if="!summary" description="上传完成后显示结果" />
+          <el-empty
+            v-if="!summary"
+            description="上传完成后显示结果"
+          />
 
           <template v-else>
-            <el-statistic title="总数" :value="summary.total" />
+            <el-statistic
+              title="总数"
+              :value="summary.total"
+            />
             <el-divider />
-            <el-statistic title="成功" :value="summary.success" />
+            <el-statistic
+              title="成功"
+              :value="summary.success"
+            />
             <el-divider />
-            <el-statistic title="失败" :value="summary.failed" />
+            <el-statistic
+              title="失败"
+              :value="summary.failed"
+            />
 
             <el-timeline class="result-timeline">
               <el-timeline-item
@@ -173,7 +234,11 @@
                     {{ formatBytes(image.fileSize) }} · {{ image.mimeType }}
                   </small>
                   <el-space>
-                    <el-button text size="small" @click="goToDetail(image.id)">
+                    <el-button
+                      text
+                      size="small"
+                      @click="goToDetail(image.id)"
+                    >
                       查看详情
                     </el-button>
                     <el-button

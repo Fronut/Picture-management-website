@@ -1,9 +1,18 @@
 <template>
   <section class="tag-manager">
-    <el-page-header content="图片标签管理" @back="handleBack" />
+    <el-page-header
+      content="图片标签管理"
+      @back="handleBack"
+    />
 
-    <el-card shadow="never" class="selector-card">
-      <el-form inline @submit.prevent>
+    <el-card
+      shadow="never"
+      class="selector-card"
+    >
+      <el-form
+        inline
+        @submit.prevent
+      >
         <el-form-item label="图片 ID">
           <el-input-number
             v-model="editableImageId"
@@ -31,8 +40,14 @@
     </el-card>
 
     <el-row :gutter="16">
-      <el-col :md="16" :xs="24">
-        <el-card shadow="never" class="tag-list-card">
+      <el-col
+        :md="16"
+        :xs="24"
+      >
+        <el-card
+          shadow="never"
+          class="tag-list-card"
+        >
           <template #header>
             <div class="card-header">
               <h3>已关联标签</h3>
@@ -48,28 +63,52 @@
             </div>
           </template>
 
-          <el-empty v-if="!tags.length && !isLoading" description="暂无标签" />
+          <el-empty
+            v-if="!tags.length && !isLoading"
+            description="暂无标签"
+          />
 
-          <el-table v-else v-loading="isLoading" :data="tags" size="small">
-            <el-table-column label="标签名" prop="tagName" min-width="150" />
-            <el-table-column label="类型" width="120">
+          <el-table
+            v-else
+            v-loading="isLoading"
+            :data="tags"
+            size="small"
+          >
+            <el-table-column
+              label="标签名"
+              prop="tagName"
+              min-width="150"
+            />
+            <el-table-column
+              label="类型"
+              width="120"
+            >
               <template #default="{ row }">
                 <el-tag :type="tagTypeColor(row.tagType)">
                   {{ formatTagType(row.tagType) }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="可信度" width="130">
+            <el-table-column
+              label="可信度"
+              width="130"
+            >
               <template #default="{ row }">
                 {{ formatConfidence(row.confidence) }}
               </template>
             </el-table-column>
-            <el-table-column label="使用次数" width="120">
+            <el-table-column
+              label="使用次数"
+              width="120"
+            >
               <template #default="{ row }">
                 {{ row.usageCount ?? 0 }}
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="120">
+            <el-table-column
+              label="操作"
+              width="120"
+            >
               <template #default="{ row }">
                 <el-button
                   text
@@ -86,18 +125,35 @@
         </el-card>
       </el-col>
 
-      <el-col :md="8" :xs="24">
-        <el-card v-loading="popularLoading" shadow="never" class="popular-card">
+      <el-col
+        :md="8"
+        :xs="24"
+      >
+        <el-card
+          v-loading="popularLoading"
+          shadow="never"
+          class="popular-card"
+        >
           <template #header>
             <div class="card-header">
               <h3>热门标签</h3>
-              <el-button text size="small" @click="refreshPopular">
+              <el-button
+                text
+                size="small"
+                @click="refreshPopular"
+              >
                 刷新
               </el-button>
             </div>
           </template>
-          <el-empty v-if="!popularTags.length" description="暂无热门标签" />
-          <el-space v-else wrap>
+          <el-empty
+            v-if="!popularTags.length"
+            description="暂无热门标签"
+          />
+          <el-space
+            v-else
+            wrap
+          >
             <el-tag
               v-for="tag in popularTags"
               :key="tag.tagId"
@@ -111,8 +167,14 @@
       </el-col>
     </el-row>
 
-    <el-row :gutter="16" class="form-row">
-      <el-col :md="14" :xs="24">
+    <el-row
+      :gutter="16"
+      class="form-row"
+    >
+      <el-col
+        :md="14"
+        :xs="24"
+      >
         <el-card shadow="never">
           <template #header>
             <div class="card-header">
@@ -140,9 +202,18 @@
                   :value="tag.tagName"
                 />
               </el-select>
-              <el-select v-model="draft.tagType" class="type-select">
-                <el-option label="自定义" value="CUSTOM" />
-                <el-option label="AI 生成" value="AI" />
+              <el-select
+                v-model="draft.tagType"
+                class="type-select"
+              >
+                <el-option
+                  label="自定义"
+                  value="CUSTOM"
+                />
+                <el-option
+                  label="AI 生成"
+                  value="AI"
+                />
               </el-select>
               <el-input-number
                 v-model="draft.confidence"
@@ -163,7 +234,11 @@
                 删除
               </el-button>
             </div>
-            <el-button text type="primary" @click="addDraftRow">
+            <el-button
+              text
+              type="primary"
+              @click="addDraftRow"
+            >
               新增行
             </el-button>
           </div>
@@ -177,7 +252,10 @@
         </el-card>
       </el-col>
 
-      <el-col :md="10" :xs="24">
+      <el-col
+        :md="10"
+        :xs="24"
+      >
         <el-card shadow="never">
           <template #header>
             <div class="card-header">

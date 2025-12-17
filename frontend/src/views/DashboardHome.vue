@@ -121,8 +121,8 @@
         />
         <el-button
           text
-          @click="resetSelection"
           :disabled="!manualHighlightIds.length"
+          @click="resetSelection"
         >
           恢复自动展示
         </el-button>
@@ -161,7 +161,7 @@
             已选 {{ selectionDraft.length }} / {{ MAX_MANUAL_SELECTION }}
           </span>
           <div class="footer-actions">
-            <el-button @click="manageDialogVisible = false">取消</el-button>
+            <el-button @click="manageDialogVisible = false"> 取消 </el-button>
             <el-button type="primary" @click="applySelection">
               保存展示
             </el-button>
@@ -296,7 +296,6 @@ const resolvePreviewUrl = async (image: ImageSearchResult) => {
     const original = await downloadOriginalImage(image.id);
     return URL.createObjectURL(original);
   } catch (error) {
-    console.error("Failed to fetch highlight image preview", error);
     return undefined;
   }
 };
@@ -398,7 +397,6 @@ const enterFullscreenCarousel = async () => {
     fullscreenCarouselActive.value = true;
   } catch (error) {
     fullscreenCarouselActive.value = true;
-    console.warn("Failed to enter fullscreen", error);
     ElMessage.warning("浏览器阻止了全屏请求，但您仍可手动退出");
   }
 };
@@ -414,14 +412,8 @@ onMounted(() => {
   loadHighlights();
   if (typeof document !== "undefined") {
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    document.addEventListener(
-      "webkitfullscreenchange",
-      handleFullscreenChange as EventListener
-    );
-    document.addEventListener(
-      "msfullscreenchange",
-      handleFullscreenChange as EventListener
-    );
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("msfullscreenchange", handleFullscreenChange);
   }
 });
 
@@ -435,12 +427,9 @@ onUnmounted(() => {
     document.removeEventListener("fullscreenchange", handleFullscreenChange);
     document.removeEventListener(
       "webkitfullscreenchange",
-      handleFullscreenChange as EventListener
+      handleFullscreenChange
     );
-    document.removeEventListener(
-      "msfullscreenchange",
-      handleFullscreenChange as EventListener
-    );
+    document.removeEventListener("msfullscreenchange", handleFullscreenChange);
   }
   if (fullscreenCarouselActive.value && getFullscreenElement()) {
     exitDocumentFullscreen();
@@ -478,7 +467,6 @@ function loadStoredSelection(): number[] {
     }
     return [];
   } catch (error) {
-    console.warn("Failed to load highlight selection", error);
     return [];
   }
 }
