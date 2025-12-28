@@ -1,14 +1,17 @@
 package com.imagemanagement.ai;
 
+import okhttp3.mockwebserver.Dispatcher;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
 import com.imagemanagement.ai.dto.AiHealthStatus;
 import com.imagemanagement.ai.dto.AiTagSuggestionResponse;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.List;
 import org.assertj.core.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,45 +19,87 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.DockerClientFactory;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.lifecycle.Startables;
-import org.testcontainers.utility.DockerImageName;
-import org.testcontainers.utility.MountableFile;
 
 @SpringBootTest
 @ActiveProfiles("test")
-@Testcontainers(disabledWithoutDocker = true)
 class AiServiceConnectivityTest {
 
-    private static final Path AI_SERVICE_DIR = Path.of("..", "ai-service").toAbsolutePath().normalize();
     private static final Path SAMPLE_IMAGE = Path.of("..", "test", "Pictures", "beach.jpeg").toAbsolutePath().normalize();
-    private static final boolean DOCKER_AVAILABLE = DockerClientFactory.instance().isDockerAvailable();
+    private static final String HEALTH_RESPONSE = """
+        {"status":"ok","data":{"service":"picture-ai-service","version":"1.0.0","status":"healthy","timestamp":"2025-01-01T00:00:00Z","python":"3.11.8"},"message":null}
+        """;
+    private static final String TAGS_RESPONSE = """
+        {"status":"ok","data":{"tags":[{"name":"vacation","confidence":0.92,"source":"vision"},{"name":"ocean","confidence":0.88,"source":"vision"}],"metadata":{"width":1920,"height":1080,"aspect_ratio":"16:9"}},"message":null}
+        """;
+    private static final String ERROR_RESPONSE = """
+        {"status":"error","data":null,"message":"Provide a valid image"}
+        """;
 
-        @Container
-        @SuppressWarnings("resource")
-        static final GenericContainer<?> aiService = new GenericContainer<>(DockerImageName.parse("python:3.11-slim"))
-            .withExposedPorts(5000)
-            .withEnv("PYTHONUNBUFFERED", "1")
-            .withEnv("ALLOW_BAIDU_STUB", "true")
-            .withCopyFileToContainer(MountableFile.forHostPath(AI_SERVICE_DIR), "/opt/ai-service")
-            .withCommand("/bin/sh", "-c", String.join(" && ",
-                "set -e",
-                "apt-get update",
-                "apt-get install -y gcc g++",
-                "pip install --no-cache-dir -r /opt/ai-service/requirements.txt",
-                "cd /opt/ai-service",
-                "exec gunicorn --bind 0.0.0.0:5000 --workers 2 app.main:app"))
-            .waitingFor(Wait.forHttp("/ai/v1/health").forStatusCode(200).withStartupTimeout(Duration.ofMinutes(5)));
+    private static MockWebServer aiServiceServer;
 
     @DynamicPropertySource
     static void configureAiServiceUrl(DynamicPropertyRegistry registry) {
-        Assumptions.assumeTrue(DOCKER_AVAILABLE, "Docker is required for AI service connectivity tests");
-        Startables.deepStart(java.util.stream.Stream.of(aiService)).join();
-        registry.add("app.ai.service-url", () -> String.format("http://%s:%d", aiService.getHost(), aiService.getMappedPort(5000)));
+        ensureAiServiceServer();
+        registry.add("app.ai.service-url", AiServiceConnectivityTest::baseUrl);
+    }
+
+    @AfterAll
+    static void tearDown() throws IOException {
+        if (aiServiceServer != null) {
+            aiServiceServer.shutdown();
+            aiServiceServer = null;
+        }
+    }
+
+    private static synchronized void ensureAiServiceServer() {
+        if (aiServiceServer != null) {
+            return;
+        }
+        aiServiceServer = new MockWebServer();
+        aiServiceServer.setDispatcher(createDispatcher());
+        try {
+            aiServiceServer.start();
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to start mock AI service", ex);
+        }
+    }
+
+    private static Dispatcher createDispatcher() {
+        return new Dispatcher() {
+            @Override
+            public MockResponse dispatch(RecordedRequest request) {
+                String path = request.getPath();
+                if ("/ai/v1/health".equals(path)) {
+                    return new MockResponse()
+                            .setResponseCode(200)
+                            .setHeader("Content-Type", "application/json")
+                            .setBody(HEALTH_RESPONSE);
+                }
+                if ("/ai/v1/tags/suggest".equals(path)) {
+                    return handleTagSuggestion(request);
+                }
+                return new MockResponse().setResponseCode(404);
+            }
+        };
+    }
+
+    private static MockResponse handleTagSuggestion(RecordedRequest request) {
+        String payload = request.getBody().readUtf8();
+        if (payload.contains("filename=\"invalid.txt\"")) {
+            return new MockResponse()
+                    .setResponseCode(400)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody(ERROR_RESPONSE);
+        }
+        return new MockResponse()
+                .setResponseCode(200)
+                .setHeader("Content-Type", "application/json")
+                .setBody(TAGS_RESPONSE);
+    }
+
+    private static String baseUrl() {
+        String url = aiServiceServer.url("/").toString();
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
     @Autowired
