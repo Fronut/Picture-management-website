@@ -11,3 +11,5 @@ yarn-error.log*
 .vscode/
 coverage/
 /.parcel-cache
+playwright-report/
+test-results/
