@@ -47,7 +47,7 @@ import org.springframework.util.StringUtils;
 public class TagServiceImpl implements TagService {
 
     private static final BigDecimal CONFIDENCE_STRONG = BigDecimal.valueOf(1.00).setScale(2, RoundingMode.HALF_UP);
-    private static final BigDecimal CONFIDENCE_AUTO = BigDecimal.valueOf(0.85).setScale(2, RoundingMode.HALF_UP);
+    private static final BigDecimal CONFIDENCE_AUTO = BigDecimal.valueOf(1.00).setScale(2, RoundingMode.HALF_UP);
     private static final int MAX_AI_GENERATED_TAGS = 5;
     private static final double MIN_AI_CONFIDENCE_THRESHOLD = 0.3d;
 
